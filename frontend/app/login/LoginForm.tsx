@@ -53,11 +53,29 @@ export default function LoginForm() {
     setIsLoading(true);
     
     try {
-      // 실제 로그인 로직 구현 필요
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // 로그인 성공 시 메인 페이지로 이동
-      router.push('/');
+      const response = await fetch('http://localhost:8080/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.identifier,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.token) {
+        // 토큰을 localStorage에 저장
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // 로그인 성공 시 메인 페이지로 이동
+        router.push('/');
+      } else {
+        setErrors({ general: data.message || '로그인에 실패했습니다. 다시 시도해주세요.' });
+      }
     } catch (error) {
       setErrors({ general: '로그인에 실패했습니다. 다시 시도해주세요.' });
     } finally {

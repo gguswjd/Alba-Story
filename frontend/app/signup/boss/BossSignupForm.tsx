@@ -94,9 +94,31 @@ export default function BossSignupForm() {
     setIsLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('사장님 회원가입 데이터:', formData);
-      router.push('/boss-dashboard');
+      const response = await fetch('http://localhost:8080/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.ownerName,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          role: 'owner',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.token) {
+        // 토큰을 localStorage에 저장
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        router.push('/boss-dashboard');
+      } else {
+        setErrors({ general: data.message || '회원가입에 실패했습니다. 다시 시도해주세요.' });
+      }
     } catch (error) {
       setErrors({ general: '회원가입에 실패했습니다. 다시 시도해주세요.' });
     } finally {
