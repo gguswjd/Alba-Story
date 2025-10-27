@@ -48,6 +48,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 비활성화
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // 인증 관련 API는 모두 허용
+                .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/api/test/**").permitAll() // 테스트 API 허용
                 .requestMatchers("/h2-console/**").permitAll() // H2 콘솔 허용
                 .anyRequest().authenticated() // 나머지는 인증 필요

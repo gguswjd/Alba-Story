@@ -299,7 +299,7 @@ export default function Header() {
             {/* Footer */}
             <div className="border-t border-gray-100 p-6 bg-gray-50">
               <div className="text-center">
-                <p className="text-sm text-gray-500 mb-2">WorkSpace와 함께</p>
+                <p className="text-sm text-gray-500 mb-2">ROUND와 함께</p>
                 <p className="text-xs text-gray-400">더 나은 근무 환경을 만들어보세요 ✨</p>
               </div>
             </div>

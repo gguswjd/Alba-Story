@@ -1,16 +1,83 @@
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import QuickActions from '@/components/QuickActions';
 import WorkplaceCard from '@/components/WorkplaceCard';
 import JoinWorkplaceModal from '@/components/JoinWorkplaceModal';
 
+type MeResponse = {
+  id: number;
+  name?: string;
+  email?: string;
+  role?: string;
+};
+
 export default function EmployeeDashboard() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [loadingMe, setLoadingMe] = useState(true);
 
+  // ✅ 로그인 토큰 검증 및 유저 정보 불러오기
+  useEffect(() => {
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+      console.warn('[EmployeeDashboard] 토큰 없음 → 로그인 페이지로 이동');
+      router.replace('/login');
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:8080/api/user/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: 'no-store',
+        });
+
+        if (res.status === 401) {
+          console.warn('[EmployeeDashboard] 401 → 로그인 만료');
+          router.replace('/login');
+          return;
+        }
+
+        const data: MeResponse = await res.json();
+        console.log('[EmployeeDashboard] me =', data);
+        setMe(data);
+      } catch (error) {
+        console.error('[EmployeeDashboard] /api/user/me 에러', error);
+        router.replace('/login');
+      } finally {
+        setLoadingMe(false);
+      }
+    })();
+  }, [router]);
+
+  // ✅ 로딩 중일 때
+  if (loadingMe) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-gray-600">
+        로딩 중...
+      </div>
+    );
+  }
+
+  // ✅ 유저 정보 없음 (예: 백엔드에서 404 리턴)
+  if (!me) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-gray-600">
+        로그인 정보가 유효하지 않습니다.
+      </div>
+    );
+  }
+
+  // === 아래부터 기존 UI ===
   const workplaces = [
     {
       id: 1,
@@ -20,7 +87,8 @@ export default function EmployeeDashboard() {
       nextShift: '오늘 14:00 - 20:00',
       manager: '김사장님',
       rating: 4.8,
-      image: 'https://readdy.ai/api/search-image?query=modern%20cozy%20coffee%20shop%20interior%20with%20warm%20lighting%2C%20barista%20counter%2C%20coffee%20machines%2C%20comfortable%20seating%20area%2C%20wooden%20furniture%2C%20plants%2C%20minimalist%20design%2C%20bright%20atmosphere&width=400&height=240&seq=workplace1&orientation=landscape'
+      image:
+        'https://readdy.ai/api/search-image?query=modern%20cozy%20coffee%20shop%20interior%20with%20warm%20lighting%2C%20barista%20counter%2C%20coffee%20machines%2C%20comfortable%20seating%20area%2C%20wooden%20furniture%2C%20plants%2C%20minimalist%20design%2C%20bright%20atmosphere&width=400&height=240&seq=workplace1&orientation=landscape',
     },
     {
       id: 2,
@@ -30,20 +98,63 @@ export default function EmployeeDashboard() {
       nextShift: '내일 09:00 - 17:00',
       manager: '이매니저님',
       rating: 4.2,
-      image: 'https://readdy.ai/api/search-image?query=modern%20fast%20food%20restaurant%20interior%20with%20red%20and%20yellow%20colors%2C%20clean%20counter%20area%2C%20digital%20menu%20boards%2C%20bright%20lighting%2C%20organized%20kitchen%20space%2C%20contemporary%20design&width=400&height=240&seq=workplace2&orientation=landscape'
-    }
+      image:
+        'https://readdy.ai/api/search-image?query=modern%20fast%20food%20restaurant%20interior%20with%20red%20and%20yellow%20colors%2C%20clean%20counter%20area%2C%20digital%20menu%20boards%2C%20bright%20lighting%2C%20organized%20kitchen%20space%2C%20contemporary%20design&width=400&height=240&seq=workplace2&orientation=landscape',
+    },
   ];
 
   const recentNotifications = [
-    { id: 1, type: 'schedule', message: '내일 근무 스케줄이 변경되었습니다', time: '2시간 전', workplace: '스타벅스 강남점' },
-    { id: 2, type: 'payment', message: '11월 급여가 입금되었습니다', time: '1일 전', workplace: '맥도날드 홍대점' },
-    { id: 3, type: 'notice', message: '새로운 공지사항이 등록되었습니다', time: '2일 전', workplace: '스타벅스 강남점' }
+    {
+      id: 1,
+      type: 'schedule',
+      message: '내일 근무 스케줄이 변경되었습니다',
+      time: '2시간 전',
+      workplace: '스타벅스 강남점',
+    },
+    {
+      id: 2,
+      type: 'payment',
+      message: '11월 급여가 입금되었습니다',
+      time: '1일 전',
+      workplace: '맥도날드 홍대점',
+    },
+    {
+      id: 3,
+      type: 'notice',
+      message: '새로운 공지사항이 등록되었습니다',
+      time: '2일 전',
+      workplace: '스타벅스 강남점',
+    },
   ];
 
   const communityPosts = [
-    { id: 1, title: '카페 알바 꿀팁 공유해요! ☕', author: '바리스타짱', likes: 24, comments: 8, time: '3시간 전', category: 'tip' },
-    { id: 2, title: '편의점 야간 근무 후기', author: '야근러', likes: 18, comments: 12, time: '5시간 전', category: 'review' },
-    { id: 3, title: '최저임금 관련 질문있어요', author: '알바생123', likes: 31, comments: 15, time: '1일 전', category: 'question' }
+    {
+      id: 1,
+      title: '카페 알바 꿀팁 공유해요! ☕',
+      author: '바리스타짱',
+      likes: 24,
+      comments: 8,
+      time: '3시간 전',
+      category: 'tip',
+    },
+    {
+      id: 2,
+      title: '편의점 야간 근무 후기',
+      author: '야근러',
+      likes: 18,
+      comments: 12,
+      time: '5시간 전',
+      category: 'review',
+    },
+    {
+      id: 3,
+      title: '최저임금 관련 질문있어요',
+      author: '알바생123',
+      likes: 31,
+      comments: 15,
+      time: '1일 전',
+      category: 'question',
+    },
   ];
 
   return (
@@ -57,11 +168,9 @@ export default function EmployeeDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  안녕하세요, 김알바님!
+                  안녕하세요, {me?.name ?? '알바생'}님!
                 </h1>
-                <p className="text-xl text-gray-600">
-                  오늘도 화이팅하세요!
-                </p>
+                <p className="text-xl text-gray-600">오늘도 화이팅하세요!</p>
               </div>
               <div className="text-6xl">💼</div>
             </div>

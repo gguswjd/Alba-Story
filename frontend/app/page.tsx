@@ -297,7 +297,7 @@ export default function Home() {
             
             <div className="border-t border-blue-100 mt-12 pt-8">
               <div className="flex flex-col md:flex-row justify-between items-center">
-                <p className="text-gray-500">© 2024 WorkSpace. All rights reserved.</p>
+                <p className="text-gray-500">© 2024 ROUND. All rights reserved.</p>
                 <div className="flex space-x-6 mt-4 md:mt-0">
                   <a href="#" className="text-gray-500 hover:text-blue-500 transition-colors">이용약관</a>
                   <a href="#" className="text-gray-500 hover:text-blue-500 transition-colors">개인정보처리방침</a>

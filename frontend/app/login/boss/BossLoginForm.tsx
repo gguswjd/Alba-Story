@@ -3,36 +3,60 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+type LoginResponse = {
+  accessToken: string;
+  user: {
+    id: number;
+    name?: string;
+    email?: string;
+    role?: string;
+  };
+  // 필요하면 refreshToken 등 추가
+};
+
+const setCookie = (name: string, value: string, maxAgeSec?: number) => {
+  const attrs = [
+    `Path=/`,
+    `SameSite=Lax`,
+    // 개발환경(http)에서는 Secure를 붙이지 않음
+    ...(typeof window !== 'undefined' && location.protocol === 'https:' ? ['Secure'] : []),
+  ];
+  if (maxAgeSec) attrs.push(`Max-Age=${maxAgeSec}`);
+  document.cookie = `${name}=${encodeURIComponent(value)}; ${attrs.join('; ')}`;
+};
+
 export default function BossLoginForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [formData, setFormData] = useState({
     identifier: '',
     password: '',
-    rememberMe: false
+    rememberMe: false,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }));
-    
+
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+    if (errors.general) {
+      setErrors((prev) => ({ ...prev, general: '' }));
     }
   };
 
   const validateForm = () => {
-    const newErrors: {[key: string]: string} = {};
+    const newErrors: { [key: string]: string } = {};
 
     if (!formData.identifier.trim()) {
       newErrors.identifier = '사업자 등록번호 또는 이메일을 입력해주세요.';
     }
-
     if (!formData.password) {
       newErrors.password = '비밀번호를 입력해주세요.';
     } else if (formData.password.length < 6) {
@@ -43,18 +67,68 @@ export default function BossLoginForm() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const setCookie = (name: string, value: string, maxAgeSec?: number) => {
+    const attrs = [
+      `Path=/`,
+      `SameSite=Lax`,
+      // 개발환경(http)에서는 Secure를 붙이지 않음
+      ...(typeof window !== 'undefined' && location.protocol === 'https:' ? ['Secure'] : []),
+    ];
+    if (maxAgeSec) attrs.push(`Max-Age=${maxAgeSec}`);
+    document.cookie = `${name}=${encodeURIComponent(value)}; ${attrs.join('; ')}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
 
     setIsLoading(true);
-    
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      router.push('/boss-dashboard');
+      const res = await fetch('http://localhost:8080/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: formData.identifier.trim(),
+          password: formData.password,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const message =
+          (err?.message && (Array.isArray(err.message) ? err.message[0] : err.message)) ||
+          '로그인에 실패했습니다. 아이디/비밀번호를 확인해주세요.';
+        setErrors({ general: message });
+        return;
+      }
+
+      const data: LoginResponse = await res.json();
+      console.log('[Login] response = ', data);
+
+      const accessToken =
+        (data as any)?.accessToken ??
+        (data as any)?.token ??
+        (data as any)?.access_token;
+
+      if (!accessToken) {
+        setErrors({ general: '로그인은 성공했지만 accessToken이 응답에 없습니다. 서버 응답 키를 확인하세요.' });
+        setIsLoading(false);
+        return;
+      }
+
+      localStorage.setItem('accessToken', accessToken);
+
+      // 2) 유저 정보도 캐싱해두면 대시보드 첫 렌더에서 깜빡임 ↓
+      if (data?.user) {
+        localStorage.setItem('me', JSON.stringify(data.user));
+      }
+
+      // 3) 라우팅
+      router.replace('/boss-dashboard');
     } catch (error) {
-      setErrors({ general: '로그인에 실패했습니다. 다시 시도해주세요.' });
+      console.error(error);
+      setErrors({ general: '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' });
     } finally {
       setIsLoading(false);
     }
@@ -86,11 +160,10 @@ export default function BossLoginForm() {
               errors.identifier ? 'border-red-300 bg-red-50' : 'border-gray-300'
             }`}
             placeholder="123-45-67890 또는 boss@example.com"
+            autoComplete="username"
           />
         </div>
-        {errors.identifier && (
-          <p className="mt-1 text-sm text-red-600">{errors.identifier}</p>
-        )}
+        {errors.identifier && <p className="mt-1 text-sm text-red-600">{errors.identifier}</p>}
       </div>
 
       <div>
@@ -111,18 +184,18 @@ export default function BossLoginForm() {
               errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
             }`}
             placeholder="비밀번호를 입력하세요"
+            autoComplete="current-password"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+            aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보이기'}
           >
             <i className={`${showPassword ? 'ri-eye-line' : 'ri-eye-off-line'} text-gray-400 hover:text-gray-600`}></i>
           </button>
         </div>
-        {errors.password && (
-          <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-        )}
+        {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
       </div>
 
       <div className="flex items-center justify-between">
@@ -136,6 +209,8 @@ export default function BossLoginForm() {
           />
           <span className="ml-2 text-sm text-gray-700">로그인 상태 유지</span>
         </label>
+        {/* 필요 시: 비밀번호 찾기 링크 */}
+        {/* <a href="/forgot-password" className="text-sm text-blue-600 hover:underline">비밀번호 찾기</a> */}
       </div>
 
       <button

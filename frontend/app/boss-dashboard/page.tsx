@@ -1,14 +1,75 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import BossQuickActions from '@/components/BossQuickActions';
 import WorkplaceManageCard from '@/components/WorkplaceManageCard';
 import { useRouter } from 'next/navigation';
 
+type MeResponse = {
+  id: number;
+  name?: string;
+  role?: string;
+}
+
 export default function BossDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [loadingMe, setLoadingMe] = useState(true);
+
+  useEffect(() => {
+    const cached = typeof window !== 'undefined' ? localStorage.getItem('me') : null;
+    if (cached) {
+      try { setMe(JSON.parse(cached)); } catch {}
+    }
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    console.log('[Dashboard] existing token = ', token);
+    if (!token) {
+      console.warn('[Dashboard] No token -> redirect to /login');
+      // 토큰 없으면 로그인 페이지로
+      router.replace('/login');
+      return;
+    }
+
+    (async () => {
+      const traceId = `me-${Date.now()}`;
+      try {
+        const res = await fetch('http://localhost:8080/api/user/me', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store', // 최신 프로필 보장
+        });
+
+        const text = await res.text(); // 응답 전문
+        console.log(`[Dashboard][${traceId}] status=`, res.status);
+        console.log(`[Dashboard][${traceId}] headers=`, Object.fromEntries(res.headers.entries()));
+        console.log(`[Dashboard][${traceId}] body=`, text);
+
+        if (res.status === 401) {
+          console.warn(`[Dashboard][${traceId}] 401 → redirect to /login`);
+          router.replace('/login');
+          return;
+        }
+        if (!res.ok) {
+          console.error(`[Dashboard][${traceId}] !ok:`, res.status, text);
+          // 실패해도 일단 머물러서 화면에서 이유를 볼 수 있게 하려면 redirect 잠깐 주석
+          // router.replace('/login');
+          return;
+        }
+
+        const data: MeResponse = JSON.parse(text);
+        setMe(data);
+        localStorage.setItem('me', JSON.stringify(data));
+      } catch (e) {
+        console.error(`[Dashboard][${traceId} fetch error:]`, e);
+      } finally {
+        setLoadingMe(false);
+      }
+    })();
+  }, [router]);
 
   const workplaces = [
     {
@@ -65,7 +126,9 @@ export default function BossDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  안녕하세요, 김사장님!
+                  {loadingMe
+                    ? '안녕하세요…' 
+                    : `안녕하세요, ${me?.name ?? '사장님'}님!`}
                 </h1>
                 <p className="text-xl text-gray-600">
                   오늘도 성공적인 매장 운영하세요!
