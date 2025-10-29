@@ -71,42 +71,116 @@ export default function BossDashboard() {
     })();
   }, [router]);
 
-  const workplaces = [
-    {
-      id: 1,
-      name: '스타벅스 강남점',
-      type: '카페',
-      status: 'active',
-      employees: 8,
-      todayShifts: 5,
-      rating: 4.8,
-      groupCode: 'STB2024',
-      image: 'https://readdy.ai/api/search-image?query=modern%20cozy%20coffee%20shop%20interior%20with%20warm%20lighting%2C%20barista%20counter%2C%20coffee%20machines%2C%20comfortable%20seating%20area%2C%20wooden%20furniture%2C%20plants%2C%20minimalist%20design%2C%20bright%20atmosphere&width=400&height=240&seq=boss-workplace1&orientation=landscape'
-    },
-    {
-      id: 2,
-      name: '맥도날드 홍대점',
-      type: '패스트푸드',
-      status: 'active',
-      employees: 12,
-      todayShifts: 8,
-      rating: 4.5,
-      groupCode: 'MCD2024',
-      image: 'https://readdy.ai/api/search-image?query=modern%20fast%20food%20restaurant%20interior%20with%20red%20and%20yellow%20colors%2C%20clean%20counter%20area%2C%20digital%20menu%20boards%2C%20bright%20lighting%2C%20organized%20kitchen%20space%2C%20contemporary%20design&width=400&height=240&seq=boss-workplace2&orientation=landscape'
-    }
-  ];
+  const [workplaces, setWorkplaces] = useState([]);
+  const [loadingWorkplaces, setLoadingWorkplaces] = useState(true);
 
-  const recentActivities = [
-    { id: 1, type: 'employee', message: '김알바님이 스타벅스 강남점에 참여 신청했습니다', time: '1시간 전', workplace: '스타벅스 강남점', status: 'pending' },
-    { id: 2, type: 'schedule', message: '내일 오전 시간대 직원이 부족합니다', time: '2시간 전', workplace: '맥도날드 홍대점', status: 'warning' },
-    { id: 3, type: 'review', message: '이알바님이 근무지 평가를 남겼습니다 (⭐4.5)', time: '3시간 전', workplace: '스타벅스 강남점', status: 'info' }
-  ];
+  // 근무지 목록 조회
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
 
-  const pendingApprovals = [
-    { id: 1, name: '김알바', position: '바리스타', experience: '6개월', rating: 4.2, workplace: '스타벅스 강남점', appliedTime: '2시간 전' },
-    { id: 2, name: '박직원', position: '크루', experience: '1년', rating: 4.6, workplace: '맥도날드 홍대점', appliedTime: '5시간 전' },
-    { id: 3, name: '이학생', position: '바리스타', experience: '신입', rating: 0, workplace: '스타벅스 강남점', appliedTime: '1일 전' }
-  ];
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:8080/api/workplace/my', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setWorkplaces(data);
+        }
+      } catch (error) {
+        console.error('근무지 조회 실패:', error);
+      } finally {
+        setLoadingWorkplaces(false);
+      }
+    })();
+  }, []);
+
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+
+  // 최근 활동 조회 (가입 신청 등)
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+
+    (async () => {
+      try {
+        // 각 근무지의 가입 신청 조회
+        const activities = [];
+        for (const workplace of workplaces) {
+          const res = await fetch(`http://localhost:8080/api/workplace/${workplace.workplaceId}/requests`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const requests = await res.json();
+            requests.forEach(req => {
+              if (req.status === 'Pending') {
+                activities.push({
+                  id: req.requestId,
+                  type: 'employee',
+                  message: `${req.userName}님이 ${req.workplaceName}에 참여 신청했습니다`,
+                  time: '방금 전',
+                  workplace: req.workplaceName,
+                  status: 'pending',
+                  requestId: req.requestId
+                });
+              }
+            });
+          }
+        }
+        setRecentActivities(activities);
+      } catch (error) {
+        console.error('활동 조회 실패:', error);
+      } finally {
+        setLoadingActivities(false);
+      }
+    })();
+  }, [workplaces]);
+
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [loadingApprovals, setLoadingApprovals] = useState(true);
+
+  // 승인 대기 목록 조회
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+
+    (async () => {
+      try {
+        const approvals = [];
+        for (const workplace of workplaces) {
+          const res = await fetch(`http://localhost:8080/api/workplace/${workplace.workplaceId}/requests`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const requests = await res.json();
+            requests.forEach(req => {
+              if (req.status === 'Pending') {
+                approvals.push({
+                  id: req.requestId,
+                  name: req.userName,
+                  position: '신규',
+                  experience: '신입',
+                  rating: 0,
+                  workplace: req.workplaceName,
+                  appliedTime: '방금 전',
+                  requestId: req.requestId,
+                  userId: req.userId,
+                  workplaceId: req.workplaceId
+                });
+              }
+            });
+          }
+        }
+        setPendingApprovals(approvals);
+      } catch (error) {
+        console.error('승인 대기 조회 실패:', error);
+      } finally {
+        setLoadingApprovals(false);
+      }
+    })();
+  }, [workplaces]);
 
   const managementTools = [
     { id: 1, title: '직원 관리', description: '직원 정보 및 근무 이력 관리', icon: 'team', color: 'blue' },
@@ -293,9 +367,17 @@ export default function BossDashboard() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {workplaces.map((workplace) => (
-                <WorkplaceManageCard key={workplace.id} workplace={workplace} />
-              ))}
+              {loadingWorkplaces ? (
+                <div className="col-span-2 text-center py-8">로딩 중...</div>
+              ) : workplaces.length === 0 ? (
+                <div className="col-span-2 text-center py-8 text-gray-500">
+                  등록된 근무지가 없습니다.
+                </div>
+              ) : (
+                workplaces.map((workplace) => (
+                  <WorkplaceManageCard key={workplace.workplaceId} workplace={workplace} />
+                ))
+              )}
             </div>
           </div>
         )}

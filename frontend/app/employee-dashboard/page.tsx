@@ -77,55 +77,56 @@ export default function EmployeeDashboard() {
     );
   }
 
-  // === 아래부터 기존 UI ===
-  const workplaces = [
-    {
-      id: 1,
-      name: '스타벅스 강남점',
-      role: '바리스타',
-      status: 'active',
-      nextShift: '오늘 14:00 - 20:00',
-      manager: '김사장님',
-      rating: 4.8,
-      image:
-        'https://readdy.ai/api/search-image?query=modern%20cozy%20coffee%20shop%20interior%20with%20warm%20lighting%2C%20barista%20counter%2C%20coffee%20machines%2C%20comfortable%20seating%20area%2C%20wooden%20furniture%2C%20plants%2C%20minimalist%20design%2C%20bright%20atmosphere&width=400&height=240&seq=workplace1&orientation=landscape',
-    },
-    {
-      id: 2,
-      name: '맥도날드 홍대점',
-      role: '크루',
-      status: 'pending',
-      nextShift: '내일 09:00 - 17:00',
-      manager: '이매니저님',
-      rating: 4.2,
-      image:
-        'https://readdy.ai/api/search-image?query=modern%20fast%20food%20restaurant%20interior%20with%20red%20and%20yellow%20colors%2C%20clean%20counter%20area%2C%20digital%20menu%20boards%2C%20bright%20lighting%2C%20organized%20kitchen%20space%2C%20contemporary%20design&width=400&height=240&seq=workplace2&orientation=landscape',
-    },
-  ];
+  const [workplaces, setWorkplaces] = useState([]);
+  const [loadingWorkplaces, setLoadingWorkplaces] = useState(true);
 
-  const recentNotifications = [
-    {
-      id: 1,
-      type: 'schedule',
-      message: '내일 근무 스케줄이 변경되었습니다',
-      time: '2시간 전',
-      workplace: '스타벅스 강남점',
-    },
-    {
-      id: 2,
-      type: 'payment',
-      message: '11월 급여가 입금되었습니다',
-      time: '1일 전',
-      workplace: '맥도날드 홍대점',
-    },
-    {
-      id: 3,
-      type: 'notice',
-      message: '새로운 공지사항이 등록되었습니다',
-      time: '2일 전',
-      workplace: '스타벅스 강남점',
-    },
-  ];
+  // 내 근무지 목록 조회
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+
+    (async () => {
+      try {
+        // WorkInfo를 통해 내 근무지 조회
+        const res = await fetch('http://localhost:8080/api/workplace/my', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setWorkplaces(data);
+        }
+      } catch (error) {
+        console.error('근무지 조회 실패:', error);
+      } finally {
+        setLoadingWorkplaces(false);
+      }
+    })();
+  }, []);
+
+  const [mySchedules, setMySchedules] = useState([]);
+  const [loadingSchedules, setLoadingSchedules] = useState(true);
+
+  // 내 스케줄 조회
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:8080/api/schedule/my', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMySchedules(data);
+        }
+      } catch (error) {
+        console.error('스케줄 조회 실패:', error);
+      } finally {
+        setLoadingSchedules(false);
+      }
+    })();
+  }, []);
 
   const communityPosts = [
     {
@@ -327,9 +328,17 @@ export default function EmployeeDashboard() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {workplaces.map((workplace) => (
-                <WorkplaceCard key={workplace.id} workplace={workplace} />
-              ))}
+              {loadingWorkplaces ? (
+                <div className="col-span-2 text-center py-8">로딩 중...</div>
+              ) : workplaces.length === 0 ? (
+                <div className="col-span-2 text-center py-8 text-gray-500">
+                  참여한 근무지가 없습니다.
+                </div>
+              ) : (
+                workplaces.map((workplace) => (
+                  <WorkplaceCard key={workplace.workplaceId} workplace={workplace} />
+                ))
+              )}
             </div>
           </div>
         )}
