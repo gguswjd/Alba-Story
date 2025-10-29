@@ -318,15 +318,44 @@ export default function NewWorkplace() {
     return colorMap[color as keyof typeof colorMap] || colorMap.gray;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('매장 등록 데이터:', { 
-      ...formData, 
-      benefits: selectedBenefits,
-      positions: selectedPositions,
-      departments: selectedDepartments
-    });
-    alert('매장이 성공적으로 등록되었습니다! 🎉');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
+    const payload = {
+      workName: formData.name,
+      address: formData.address,
+      regNumber: formData.businessRegistration.number,
+    };
+
+    try {
+      const res = await fetch('http://localhost:8080/api/workplace', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('근무지 생성 실패:', res.status, text);
+        alert('근무지 생성에 실패했습니다. 입력값을 확인해 주세요.');
+        return;
+      }
+
+      // 성공 시 대시보드로 이동하여 목록에서 확인
+      alert('매장이 성공적으로 등록되었습니다! 🎉');
+      window.location.href = '/boss-dashboard?tab=workplaces';
+    } catch (err) {
+      console.error('근무지 생성 에러:', err);
+      alert('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    }
   };
 
   return (

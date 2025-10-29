@@ -1,7 +1,3 @@
-
-'use client';
-
-export default function BossQuickActions() {
 'use client';
 
 import { useRouter } from 'next/navigation';

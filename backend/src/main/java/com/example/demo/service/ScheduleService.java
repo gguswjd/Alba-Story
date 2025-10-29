@@ -32,7 +32,7 @@ public class ScheduleService {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
+    @Autowired(required = false)
     private OpenAiService openAiService;
 
     // 알바생 선호도 등록

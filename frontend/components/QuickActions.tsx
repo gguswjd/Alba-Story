@@ -1,7 +1,3 @@
-
-'use client';
-
-export default function QuickActions() {
 'use client';
 
 import { useRouter } from 'next/navigation';
