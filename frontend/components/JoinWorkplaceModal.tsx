@@ -1,7 +1,12 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
+
+interface Workplace {
+  workplaceId: number | string;
+  workName: string;
+  address: string;
+}
 
 interface JoinWorkplaceModalProps {
   isOpen: boolean;
@@ -9,37 +14,33 @@ interface JoinWorkplaceModalProps {
 }
 
 export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceModalProps) {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
-    workplaceCode: '',
+    workplaceCode: '', // ← 여기엔 workplace_id를 입력/표시
     name: '',
     phone: '',
     email: '',
     availableDays: [] as string[],
-    availableTime: {
-      start: '09:00',
-      end: '18:00'
-    },
-    workType: 'regular', // 'regular' or 'schedule'
-    position: ''
+    availableTime: { start: '09:00', end: '18:00' },
+    workType: 'regular' as 'regular' | 'schedule',
+    position: '',
   });
 
-  const [availableWorkplaces, setAvailableWorkplaces] = useState([]);
-  const [selectedWorkplace, setSelectedWorkplace] = useState(null);
+  const [availableWorkplaces, setAvailableWorkplaces] = useState<Workplace[]>([]);
+  const [selectedWorkplace, setSelectedWorkplace] = useState<Workplace | null>(null);
 
-  // 근무지 목록 조회
   useEffect(() => {
-    if (isOpen) {
-      fetchAvailableWorkplaces();
-    }
+    if (isOpen) fetchAvailableWorkplaces();
   }, [isOpen]);
 
   const fetchAvailableWorkplaces = async () => {
     try {
       const res = await fetch('http://localhost:8080/api/workplace');
-      if (res.ok) {
-        const data = await res.json();
-        setAvailableWorkplaces(data);
-      }
+      if (!res.ok) throw new Error('Failed to fetch workplaces');
+      const data: Workplace[] = await res.json();
+      setAvailableWorkplaces(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('근무지 목록 조회 실패:', error);
     }
@@ -52,27 +53,18 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
     { value: 'thursday', label: '목' },
     { value: 'friday', label: '금' },
     { value: 'saturday', label: '토' },
-    { value: 'sunday', label: '일' }
+    { value: 'sunday', label: '일' },
   ];
-
-  const positionOptions = [
-    '매니저', '팀장', '주임', '사원', '아르바이트', '인턴', '계약직', '정규직'
-  ];
+  const positionOptions = ['매니저', '팀장', '주임', '사원', '아르바이트', '인턴', '계약직', '정규직'];
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleTimeChange = (timeType: string, value: string) => {
+  const handleTimeChange = (timeType: 'start' | 'end', value: string) => {
     setFormData(prev => ({
       ...prev,
-      availableTime: {
-        ...prev.availableTime,
-        [timeType]: value
-      }
+      availableTime: { ...prev.availableTime, [timeType]: value },
     }));
   };
 
@@ -81,44 +73,87 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
       ...prev,
       availableDays: prev.availableDays.includes(day)
         ? prev.availableDays.filter(d => d !== day)
-        : [...prev.availableDays, day]
+        : [...prev.availableDays, day],
     }));
   };
 
-  const handleWorkTypeChange = (type: string) => {
-    setFormData(prev => ({
-      ...prev,
-      workType: type
-    }));
+  const handleWorkTypeChange = (type: 'regular' | 'schedule') => {
+    setFormData(prev => ({ ...prev, workType: type }));
+  };
+
+  // 코드(= workplace_id)로 근무지 선택 (조회 실패해도 막지 않음)
+  const selectWorkplaceByCode = async () => {
+    const code = formData.workplaceCode.trim();
+    if (!code) {
+      alert('근무지 코드를 입력해주세요. (workplace_id)');
+      return;
+    }
+
+    // ① 목록에서 workplace_id 매칭
+    const found = availableWorkplaces.find(w => String(w.workplaceId) === code);
+    if (found) {
+      setSelectedWorkplace(found);
+      return;
+    }
+
+    // ② API로 단건 조회 시도 (없어도 통과)
+    try {
+      const res = await fetch(`http://localhost:8080/api/workplace/${encodeURIComponent(code)}`);
+      if (res.ok) {
+        const w: Workplace = await res.json();
+        if (w && w.workplaceId) {
+          setSelectedWorkplace(w);
+          return;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // 조회가 안돼도 다음 스텝 가능하므로 선택은 null로 유지
+    setSelectedWorkplace(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('로그인이 필요합니다.');
-        return;
-      }
 
-      // 근무지 가입 신청
-      const res = await fetch(`http://localhost:8080/api/workplace/join?workplaceId=${selectedWorkplace.workplaceId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+    const workplaceIdToSend =
+      selectedWorkplace?.workplaceId ?? formData.workplaceCode.trim();
+
+    if (!workplaceIdToSend) {
+      alert('workplace_id가 없습니다. Step 1에서 코드를 입력해주세요.');
+      return;
+    }
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(
+        `http://localhost:8080/api/workplace/join?workplaceId=${encodeURIComponent(
+          String(workplaceIdToSend)
+        )}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          // body: JSON.stringify({ ...formData }),
         }
-      });
+      );
 
       if (res.ok) {
         alert('근무지 참여 신청이 완료되었습니다! 🎉\n사장님의 승인을 기다려주세요.');
         onClose();
         resetForm();
       } else {
-        const error = await res.json();
-        alert(error.message || '신청에 실패했습니다.');
+        const error = await res.json().catch(() => ({}));
+        alert(error?.message || '신청에 실패했습니다.');
       }
     } catch (error) {
       console.error('근무지 가입 신청 실패:', error);
@@ -135,23 +170,16 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
       phone: '',
       email: '',
       availableDays: [],
-      availableTime: {
-        start: '09:00',
-        end: '18:00'
-      },
+      availableTime: { start: '09:00', end: '18:00' },
       workType: 'regular',
-      position: ''
+      position: '',
     });
+    setSelectedWorkplace(null);
     setStep(1);
   };
 
-  const nextStep = () => {
-    if (step < 3) setStep(step + 1);
-  };
-
-  const prevStep = () => {
-    if (step > 1) setStep(step - 1);
-  };
+  const nextStep = () => setStep(prev => (prev < 3 ? ((prev + 1) as 1 | 2 | 3) : prev));
+  const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as 1 | 2 | 3) : prev));
 
   if (!isOpen) return null;
 
@@ -172,42 +200,28 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
               <i className="ri-close-line text-gray-600"></i>
             </button>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="mt-6">
             <div className="relative">
-              {/* 연결선 */}
               <div className="absolute top-4 left-0 right-0 h-1 bg-gray-200"></div>
-              <div className={`absolute top-4 left-0 h-1 bg-blue-500 transition-all duration-300 ${
-                step === 1 ? 'w-0' : step === 2 ? 'w-1/2' : 'w-full'
-              }`}></div>
-              
-              {/* 단계 번호들 */}
+              <div
+                className={`absolute top-4 left-0 h-1 bg-blue-500 transition-all duration-300 ${
+                  step === 1 ? 'w-0' : step === 2 ? 'w-1/2' : 'w-full'
+                }`}
+              ></div>
+
               <div className="relative flex justify-between">
                 <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step >= 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    1
-                  </div>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'}`}>1</div>
                   <span className="text-sm text-gray-600 mt-2">근무지 찾기</span>
                 </div>
-                
                 <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step >= 2 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    2
-                  </div>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 2 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'}`}>2</div>
                   <span className="text-sm text-gray-600 mt-2">개인정보</span>
                 </div>
-                
                 <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step >= 3 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    3
-                  </div>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 3 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'}`}>3</div>
                   <span className="text-sm text-gray-600 mt-2">근무조건</span>
                 </div>
               </div>
@@ -219,10 +233,33 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
           {/* Step 1: 근무지 찾기 */}
           {step === 1 && (
             <div className="space-y-6">
+              {/* 코드 입력(= workplace_id 입력) */}
+              <div className="mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">근무지 코드 *</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.workplaceCode}
+                    onChange={(e) => handleInputChange('workplaceCode', e.target.value)}
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="예) 1024 또는 ABC123"
+                  />
+                  <button
+                    type="button"
+                    onClick={selectWorkplaceByCode}
+                    className="px-4 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    코드로 확인
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  근무지 그룹 코드를 입력해주세요.
+                </p>
+              </div>
+
+              {/* 리스트에서 직접 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  근무지 선택 *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">근무지 선택 (선택)</label>
                 <div className="space-y-3">
                   {availableWorkplaces.map((workplace) => (
                     <button
@@ -230,7 +267,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                       type="button"
                       onClick={() => {
                         setSelectedWorkplace(workplace);
-                        handleInputChange('workplaceCode', workplace.workName);
+                        handleInputChange('workplaceCode', String(workplace.workplaceId));
                       }}
                       className={`w-full p-4 rounded-xl border-2 transition-all cursor-pointer text-left ${
                         selectedWorkplace?.workplaceId === workplace.workplaceId
@@ -239,7 +276,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                       }`}
                     >
                       <div className="flex items-center space-x-4">
-                        <img 
+                        <img
                           src="https://readdy.ai/api/search-image?query=modern%20cozy%20coffee%20shop%20exterior%20with%20glass%20windows%2C%20warm%20lighting%2C%20coffee%20shop%20sign%2C%20urban%20street%20setting%2C%20inviting%20atmosphere%2C%20contemporary%20design&width=60&height=60&seq=workplace-preview&orientation=squarish"
                           alt="근무지"
                           className="w-12 h-12 rounded-lg object-cover"
@@ -247,9 +284,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                         <div className="flex-1">
                           <h4 className="font-bold text-gray-800">{workplace.workName}</h4>
                           <p className="text-sm text-gray-600">{workplace.address}</p>
-                          <div className="flex items-center mt-1">
-                            <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">모집중</span>
-                          </div>
+                          <p className="text-xs text-gray-500 mt-1">workplace_id: {String(workplace.workplaceId)}</p>
                         </div>
                         {selectedWorkplace?.workplaceId === workplace.workplaceId && (
                           <i className="ri-check-circle-fill text-blue-500 text-xl"></i>
@@ -258,37 +293,23 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">참여하고 싶은 근무지를 선택해주세요</p>
               </div>
 
-              <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
-                <h3 className="font-bold text-gray-800 mb-3 flex items-center">
-                  <i className="ri-information-line mr-2 text-blue-500"></i>
-                  근무지 코드란?
-                </h3>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li>• 각 근무지마다 고유한 코드가 있어요</li>
-                  <li>• 사장님이나 매니저에게 코드를 받으세요</li>
-                  <li>• 코드 입력 후 근무지 정보를 확인할 수 있어요</li>
-                </ul>
-              </div>
-
-              {selectedWorkplace && (
-                <div className="bg-green-50 rounded-2xl p-6 border border-green-100">
-                  <div className="flex items-center space-x-4">
-                    <img 
-                      src="https://readdy.ai/api/search-image?query=modern%20cozy%20coffee%20shop%20exterior%20with%20glass%20windows%2C%20warm%20lighting%2C%20coffee%20shop%20sign%2C%20urban%20street%20setting%2C%20inviting%20atmosphere%2C%20contemporary%20design&width=80&height=80&seq=workplace-preview&orientation=squarish"
-                      alt="근무지"
-                      className="w-16 h-16 rounded-xl object-cover object-top"
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-bold text-gray-800">{selectedWorkplace.workName}</h4>
-                      <p className="text-sm text-gray-600">{selectedWorkplace.address}</p>
-                      <div className="flex items-center mt-1">
-                        <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">모집중</span>
-                      </div>
+              {/* 선택 요약 (선택됨/미선택 모두 안내) */}
+              {formData.workplaceCode.trim() && (
+                <div className={`${selectedWorkplace ? 'bg-green-50 border-green-100' : 'bg-yellow-50 border-yellow-100'} rounded-2xl p-6 border`}>
+                  <div className="flex items-start">
+                    <i className={`mr-3 text-xl ${selectedWorkplace ? 'ri-check-line text-green-600' : 'ri-alert-line text-yellow-600'}`}></i>
+                    <div>
+                      <p className="font-bold text-gray-800">
+                        workplace_id: {formData.workplaceCode.trim()}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {selectedWorkplace
+                          ? `${selectedWorkplace.workName} / ${selectedWorkplace.address}`
+                          : '조회 결과가 없지만, 입력한 workplace_id로 계속 진행할 수 있어요.'}
+                      </p>
                     </div>
-                    <i className="ri-check-circle-fill text-green-500 text-xl"></i>
                   </div>
                 </div>
               )}
@@ -297,7 +318,8 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                 <button
                   type="button"
                   onClick={nextStep}
-                  disabled={!selectedWorkplace}
+                  // 선택이 없어도 코드만 있으면 통과
+                  disabled={!formData.workplaceCode.trim()}
                   className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   다음 단계
@@ -312,9 +334,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    이름 *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">이름 *</label>
                   <input
                     type="text"
                     required
@@ -324,11 +344,8 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                     placeholder="홍길동"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    연락처 *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">연락처 *</label>
                   <input
                     type="tel"
                     required
@@ -341,9 +358,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  이메일 *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">이메일 *</label>
                 <input
                   type="email"
                   required
@@ -355,11 +370,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
               </div>
 
               <div className="flex justify-between">
-                <button
-                  type="button"
-                  onClick={prevStep}
-                  className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
-                >
+                <button type="button" onClick={prevStep} className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-arrow-left-line mr-2"></i>
                   이전 단계
                 </button>
@@ -381,17 +392,13 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
             <div className="space-y-6">
               {/* 근무 형태 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  근무 형태 *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">근무 형태 *</label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     type="button"
                     onClick={() => handleWorkTypeChange('regular')}
                     className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      formData.workType === 'regular'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      formData.workType === 'regular' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                     }`}
                   >
                     <div className="text-center">
@@ -404,9 +411,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                     type="button"
                     onClick={() => handleWorkTypeChange('schedule')}
                     className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      formData.workType === 'schedule'
-                        ? 'border-purple-500 bg-purple-50 text-purple-700'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      formData.workType === 'schedule' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                     }`}
                   >
                     <div className="text-center">
@@ -420,9 +425,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
 
               {/* 직급 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  희망 직급 *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">희망 직급 *</label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {positionOptions.map((position) => (
                     <button
@@ -430,9 +433,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                       type="button"
                       onClick={() => handleInputChange('position', position)}
                       className={`px-4 py-3 rounded-xl border-2 transition-all cursor-pointer text-sm font-medium whitespace-nowrap ${
-                        formData.position === position
-                          ? 'border-green-500 bg-green-50 text-green-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        formData.position === position ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                       }`}
                     >
                       {position}
@@ -443,9 +444,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
 
               {/* 근무 요일 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  근무 요일 *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">근무 요일 *</label>
                 <div className="flex flex-wrap gap-3">
                   {weekDays.map((day) => (
                     <button
@@ -453,9 +452,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                       type="button"
                       onClick={() => toggleDay(day.value)}
                       className={`w-12 h-12 rounded-full border-2 transition-all cursor-pointer font-medium ${
-                        formData.availableDays.includes(day.value)
-                          ? 'border-blue-500 bg-blue-500 text-white'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        formData.availableDays.includes(day.value) ? 'border-blue-500 bg-blue-500 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                       }`}
                     >
                       {day.label}
@@ -467,9 +464,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
 
               {/* 근무 시간 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  근무 시간 *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">근무 시간 *</label>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">시작 시간</label>
@@ -495,11 +490,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
               </div>
 
               <div className="flex justify-between">
-                <button
-                  type="button"
-                  onClick={prevStep}
-                  className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
-                >
+                <button type="button" onClick={prevStep} className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap">
                   <i className="ri-arrow-left-line mr-2"></i>
                   이전 단계
                 </button>

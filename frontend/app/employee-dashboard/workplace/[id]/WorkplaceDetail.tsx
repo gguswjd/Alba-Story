@@ -101,40 +101,54 @@ export default function WorkplaceDetail({ workplaceId }: WorkplaceDetailProps) {
   const [handoverNotes, setHandoverNotes] = useState([
     {
       id: 1,
+      author: '김사장',
+      time: '2025.10.30 15:30',
+      shift: '매니저',
+      content:
+        '오늘 새로운 메뉴 교육 자료가 도착했습니다. 직원들에게 안내해주시고, 레시피 숙지 후 고객 응대 시작해주세요.',
+      type: 'info',
+      isManager: true
+    },
+    {
+      id: 2,
       author: '김바리스타',
-      time: '2024.12.16 13:50',
+      time: '2025.10.30 13:50',
       shift: '14:00-20:00',
       content:
         '오늘 에스프레소 머신 청소 완료했습니다. 원두 재고 부족하니 다음 근무자분이 확인해주세요.',
       type: 'info',
+      isManager: false
     },
     {
-      id: 2,
+      id: 3,
+      author: '김사장',
+      time: '2025.10.30 13:00',
+      shift: '매니저',
+      content:
+        '점심시간 이후 본사 점검이 있을 예정입니다. 매장 정리정돈과 위생 관리에 특히 신경 써주세요.',
+      type: 'warning',
+      isManager: true
+    },
+    {
+      id: 4,
       author: '박알바',
-      time: '2024.12.16 12:30',
+      time: '2025.10.30 12:30',
       shift: '09:00-13:00',
       content:
         '점심시간 전에 테이블 5번 손님이 아이스 아메리카노 엎지셨어요. 청소는 완료했지만 바닥이 조금 미끄러울 수 있으니 주의해주세요.',
       type: 'warning',
+      isManager: false
     },
     {
-      id: 3,
-      author: '이매니저',
-      time: '2024.12.16 08:45',
-      shift: '오픈 준비',
+      id: 5,
+      author: '김사장',
+      time: '2025.10.30 09:00',
+      shift: '매니저',
       content:
-        '새로운 시즌 메뉴 레시피가 카운터 옆에 있습니다. 손님 문의 시 참고해주세요. 디카페인 원두가 새로 들어왔어요.',
-      type: 'info',
-    },
-    {
-      id: 4,
-      author: '최시니어',
-      time: '2024.12.15 21:45',
-      shift: '마감 정리',
-      content:
-        '마감 정리 완료. 내일 오픈 전에 냉장고 온도 체크 필요합니다. 우유 유통기한도 확인해주세요.',
+        '이번 주 매출 목표 달성을 위해 추천 메뉴 적극 안내 부탁드립니다. 고객 만족도 향상에도 신경 써 주세요.',
       type: 'task',
-    },
+      isManager: true
+    }
   ]);
 
   const getStatusColor = (status: string) => {
