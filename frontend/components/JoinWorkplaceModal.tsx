@@ -16,6 +16,7 @@ interface JoinWorkplaceModalProps {
 export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCodeChecked, setIsCodeChecked] = useState(false);
 
   const [formData, setFormData] = useState({
     workplaceCode: '', // ← 여기엔 workplace_id를 입력/표시
@@ -35,16 +36,69 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
     if (isOpen) fetchAvailableWorkplaces();
   }, [isOpen]);
 
-  const fetchAvailableWorkplaces = async () => {
+  // 🔹 신청한 근무지 workplaceId를 localStorage에 저장
+  const savePendingWorkplaceId = (workplaceId: number | string) => {
+    if (typeof window === 'undefined') return;
+
+    const key = 'pendingWorkplaceIds';
+    const idStr = String(workplaceId);
+
     try {
-      const res = await fetch('http://localhost:8080/api/workplace');
-      if (!res.ok) throw new Error('Failed to fetch workplaces');
-      const data: Workplace[] = await res.json();
-      setAvailableWorkplaces(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('근무지 목록 조회 실패:', error);
+      const raw = localStorage.getItem(key);
+      let ids: string[] = raw ? JSON.parse(raw) : [];
+
+      if (!Array.isArray(ids)) {
+        ids = [];
+      }
+
+      if (!ids.includes(idStr)) {
+        ids.push(idStr);
+        localStorage.setItem(key, JSON.stringify(ids));
+      }
+    } catch (e) {
+      console.error('pendingWorkplaceIds 저장 중 오류:', e);
+      // 깨졌을 수 있으니 그냥 새로 저장
+      localStorage.setItem(key, JSON.stringify([idStr]));
     }
   };
+
+  // 근무지 리스트 조회
+  const fetchAvailableWorkplaces = async () => {
+    try {
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+      const res = await fetch('http://localhost:8080/api/workplace', {
+        headers: token
+          ? { Authorization: `Bearer ${token}` }
+          : {},
+      });
+
+      if (!res.ok) {
+        console.error('근무지 목록 응답 코드:', res.status);
+        throw new Error('Failed to fetch workplaces');
+      }
+
+      const raw = await res.json();
+      // 배열 / 페이지 응답 둘 다 대응
+      const data: Workplace[] = Array.isArray(raw)
+        ? raw
+        : raw.content ?? raw.data ?? [];
+
+      console.log('근무지 목록 응답 raw:', raw, '파싱 결과:', data);
+      setAvailableWorkplaces(data || []);
+    } catch (error) {
+      console.error('근무지 목록 조회 실패:', error);
+      setAvailableWorkplaces([]);
+    }
+  };
+
+  // 🔹 코드 입력을 기준으로 화면에 보여줄 근무지 필터링
+  const filteredWorkplaces = formData.workplaceCode.trim()
+    ? availableWorkplaces.filter((w) =>
+        String(w.workplaceId).includes(formData.workplaceCode.trim())
+      )
+    : [];
 
   const weekDays = [
     { value: 'monday', label: '월' },
@@ -89,25 +143,52 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
       return;
     }
 
+    setIsCodeChecked(true);
+
+    console.log('현재 availableWorkplaces:', availableWorkplaces);
+
     // ① 목록에서 workplace_id 매칭
     const found = availableWorkplaces.find(w => String(w.workplaceId) === code);
     if (found) {
+      console.log('리스트에서 매칭된 근무지:', found);
       setSelectedWorkplace(found);
       return;
     }
 
     // ② API로 단건 조회 시도 (없어도 통과)
     try {
-      const res = await fetch(`http://localhost:8080/api/workplace/${encodeURIComponent(code)}`);
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+      const res = await fetch(
+        `http://localhost:8080/api/workplace/${encodeURIComponent(code)}`,
+        {
+          headers: token
+            ? { Authorization: `Bearer ${token}` }
+            : {},
+        }
+      );
+
+      console.log(`/api/workplace/${code} 응답 status:`, res.status);
+
       if (res.ok) {
-        const w: Workplace = await res.json();
-        if (w && w.workplaceId) {
-          setSelectedWorkplace(w);
+        const w = await res.json();
+        console.log('단건 조회 응답:', w);
+
+        // snake_case / camelCase 둘 다 대비해서 정규화
+        const normalized: Workplace = {
+          workplaceId: (w.workplaceId ?? w.workplace_id) as number | string,
+          workName: w.workName ?? w.work_name,
+          address: w.address,
+        };
+
+        if (normalized.workplaceId) {
+          setSelectedWorkplace(normalized);
           return;
         }
       }
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.error('단건 근무지 조회 실패:', e);
     }
 
     // 조회가 안돼도 다음 스텝 가능하므로 선택은 null로 유지
@@ -148,6 +229,9 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
       );
 
       if (res.ok) {
+        // 🔹 여기서 pending workplaceId 저장
+        savePendingWorkplaceId(workplaceIdToSend);
+
         alert('근무지 참여 신청이 완료되었습니다! 🎉\n사장님의 승인을 기다려주세요.');
         onClose();
         resetForm();
@@ -175,6 +259,7 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
       position: '',
     });
     setSelectedWorkplace(null);
+    setIsCodeChecked(false);
     setStep(1);
   };
 
@@ -233,14 +318,19 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
           {/* Step 1: 근무지 찾기 */}
           {step === 1 && (
             <div className="space-y-6">
-              {/* 코드 입력(= workplace_id 입력) */}
+              {/* 근무지 코드 입력 */}
               <div className="mb-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">근무지 코드 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  근무지 코드 *
+                </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={formData.workplaceCode}
-                    onChange={(e) => handleInputChange('workplaceCode', e.target.value)}
+                    onChange={(e) => {
+                      handleInputChange('workplaceCode', e.target.value);
+                      setIsCodeChecked(false);   // ← 코드를 바꾸면 다시 false
+                    }}
                     className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     placeholder="예) 1024 또는 ABC123"
                   />
@@ -257,69 +347,61 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                 </p>
               </div>
 
-              {/* 리스트에서 직접 선택 */}
+              {/* 근무지 리스트 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">근무지 선택 (선택)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  근무지 선택 (선택)
+                </label>
+
+                {/* 코드 확인 전에는 아무것도 안 보여줌 */}
+                {!isCodeChecked && (
+                  <p className="text-xs text-gray-500">코드를 입력 후 "코드로 확인"을 눌러주세요.</p>
+                )}
+
                 <div className="space-y-3">
-                  {availableWorkplaces.map((workplace) => (
-                    <button
-                      key={workplace.workplaceId}
-                      type="button"
-                      onClick={() => {
-                        setSelectedWorkplace(workplace);
-                        handleInputChange('workplaceCode', String(workplace.workplaceId));
-                      }}
-                      className={`w-full p-4 rounded-xl border-2 transition-all cursor-pointer text-left ${
-                        selectedWorkplace?.workplaceId === workplace.workplaceId
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <img
-                          src="https://readdy.ai/api/search-image?query=modern%20cozy%20coffee%20shop%20exterior%20with%20glass%20windows%2C%20warm%20lighting%2C%20coffee%20shop%20sign%2C%20urban%20street%20setting%2C%20inviting%20atmosphere%2C%20contemporary%20design&width=60&height=60&seq=workplace-preview&orientation=squarish"
-                          alt="근무지"
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-bold text-gray-800">{workplace.workName}</h4>
-                          <p className="text-sm text-gray-600">{workplace.address}</p>
-                          <p className="text-xs text-gray-500 mt-1">workplace_id: {String(workplace.workplaceId)}</p>
+                  {/* 코드 확인됨 + 결과 있음 */}
+                  {isCodeChecked && filteredWorkplaces.length > 0 &&
+                    filteredWorkplaces.map((workplace) => (
+                      <button
+                        key={workplace.workplaceId}
+                        type="button"
+                        onClick={() => {
+                          setSelectedWorkplace(workplace);
+                          handleInputChange('workplaceCode', String(workplace.workplaceId));
+                        }}
+                        className={`w-full p-4 rounded-xl border-2 transition-all cursor-pointer text-left ${
+                          selectedWorkplace?.workplaceId === workplace.workplaceId
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="flex-1">
+                            <h4 className="font-bold text-gray-800">{workplace.workName}</h4>
+                            <p className="text-sm text-gray-600">{workplace.address}</p>
+                          </div>
+                          {selectedWorkplace?.workplaceId === workplace.workplaceId && (
+                            <i className="ri-check-circle-fill text-blue-500 text-xl"></i>
+                          )}
                         </div>
-                        {selectedWorkplace?.workplaceId === workplace.workplaceId && (
-                          <i className="ri-check-circle-fill text-blue-500 text-xl"></i>
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))}
+
+                  {/* 코드 확인됨 + 결과 없음 */}
+                  {isCodeChecked && filteredWorkplaces.length === 0 && (
+                    <p className="text-xs text-red-500">해당 코드의 근무지를 찾을 수 없습니다.</p>
+                  )}
                 </div>
               </div>
-
-              {/* 선택 요약 (선택됨/미선택 모두 안내) */}
-              {formData.workplaceCode.trim() && (
-                <div className={`${selectedWorkplace ? 'bg-green-50 border-green-100' : 'bg-yellow-50 border-yellow-100'} rounded-2xl p-6 border`}>
-                  <div className="flex items-start">
-                    <i className={`mr-3 text-xl ${selectedWorkplace ? 'ri-check-line text-green-600' : 'ri-alert-line text-yellow-600'}`}></i>
-                    <div>
-                      <p className="font-bold text-gray-800">
-                        workplace_id: {formData.workplaceCode.trim()}
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {selectedWorkplace
-                          ? `${selectedWorkplace.workName} / ${selectedWorkplace.address}`
-                          : '조회 결과가 없지만, 입력한 workplace_id로 계속 진행할 수 있어요.'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={nextStep}
-                  // 선택이 없어도 코드만 있으면 통과
-                  disabled={!formData.workplaceCode.trim()}
+                  disabled={
+                    !formData.workplaceCode.trim() || // 코드 비어 있으면 X
+                    !isCodeChecked                    // 코드로 확인 안 했으면 X
+                  }
                   className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   다음 단계
@@ -370,7 +452,11 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
               </div>
 
               <div className="flex justify-between">
-                <button type="button" onClick={prevStep} className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
+                >
                   <i className="ri-arrow-left-line mr-2"></i>
                   이전 단계
                 </button>
@@ -398,7 +484,9 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                     type="button"
                     onClick={() => handleWorkTypeChange('regular')}
                     className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      formData.workType === 'regular' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      formData.workType === 'regular'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                     }`}
                   >
                     <div className="text-center">
@@ -411,7 +499,9 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                     type="button"
                     onClick={() => handleWorkTypeChange('schedule')}
                     className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                      formData.workType === 'schedule' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      formData.workType === 'schedule'
+                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                     }`}
                   >
                     <div className="text-center">
@@ -433,7 +523,9 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                       type="button"
                       onClick={() => handleInputChange('position', position)}
                       className={`px-4 py-3 rounded-xl border-2 transition-all cursor-pointer text-sm font-medium whitespace-nowrap ${
-                        formData.position === position ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        formData.position === position
+                          ? 'border-green-500 bg-green-50 text-green-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                       }`}
                     >
                       {position}
@@ -452,7 +544,9 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
                       type="button"
                       onClick={() => toggleDay(day.value)}
                       className={`w-12 h-12 rounded-full border-2 transition-all cursor-pointer font-medium ${
-                        formData.availableDays.includes(day.value) ? 'border-blue-500 bg-blue-500 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        formData.availableDays.includes(day.value)
+                          ? 'border-blue-500 bg-blue-500 text-white'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                       }`}
                     >
                       {day.label}
@@ -490,7 +584,11 @@ export default function JoinWorkplaceModal({ isOpen, onClose }: JoinWorkplaceMod
               </div>
 
               <div className="flex justify-between">
-                <button type="button" onClick={prevStep} className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors cursor-pointer whitespace-nowrap"
+                >
                   <i className="ri-arrow-left-line mr-2"></i>
                   이전 단계
                 </button>

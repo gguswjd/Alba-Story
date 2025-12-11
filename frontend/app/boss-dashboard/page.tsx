@@ -12,7 +12,7 @@ type MeResponse = {
   role?: string;
 };
 
-/** ✅ WorkplaceManageCard 가 기대하는 형태에 맞춘 타입 */
+/** ✅ WorkplaceManageCard 가 기대하는 형태에 맞춘 타입 (이미지 제거 버전) */
 type Workplace = {
   id: number;
   name: string;
@@ -21,7 +21,6 @@ type Workplace = {
   rating?: number;
   manager?: string;
   nextShift?: string;
-  image?: string;
 
   /** 카드가 필수로 요구하는 필드들 */
   employees: number;     // 총 직원 수
@@ -63,7 +62,9 @@ export default function BossDashboard() {
   useEffect(() => {
     const cached = typeof window !== 'undefined' ? localStorage.getItem('me') : null;
     if (cached) {
-      try { setMe(JSON.parse(cached)); } catch {}
+      try {
+        setMe(JSON.parse(cached));
+      } catch {}
     }
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -102,7 +103,7 @@ export default function BossDashboard() {
     })();
   }, [router]);
 
-  // --- Workplaces (정규화) ---
+  // --- Workplaces (DB 값) ---
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [loadingWorkplaces, setLoadingWorkplaces] = useState(true);
 
@@ -127,18 +128,16 @@ export default function BossDashboard() {
 
         const list: any[] = JSON.parse(raw) ?? [];
 
-        /** ✅ 카드 스키마에 맞게 변환 */
+        /** ✅ 카드 스키마에 맞게 변환 (image 제거) */
         const normalized: Workplace[] = list.map((w: any) => ({
           id: w.id ?? w.workplaceId,
-          name: w.name ?? w.workplaceName ?? '이름없음',
+          name: w.name ?? w.workName ?? w.work_name ?? w.workplaceName ?? '이름없음',
           type: w.type ?? w.category ?? '',
           status: w.status ?? w.workplaceStatus ?? '',
-          rating: w.rating ?? 0,
+          rating: typeof w.rating === 'number' ? w.rating : 0,
           manager: w.manager ?? w.ownerName ?? '',
           nextShift: w.nextShift ?? '',
-          image: w.image ?? w.thumbnailUrl ?? '',
 
-          // 필수 항목: 백엔드 필드명 추정 매핑 + 기본값
           employees: w.employees ?? w.employeeCount ?? 0,
           todayShifts: w.todayShifts ?? w.todayWorkers ?? w.todayCount ?? 0,
           groupCode: w.groupCode ?? w.code ?? '',
@@ -152,6 +151,23 @@ export default function BossDashboard() {
       }
     })();
   }, []);
+
+  // --- DB 기반 집계값 (Quick Stats) ---
+  const totalWorkplaces = workplaces.length;
+  const totalEmployees = workplaces.reduce(
+    (sum, w) => sum + (w.employees ?? 0),
+    0
+  );
+  const totalTodayWorkers = workplaces.reduce(
+    (sum, w) => sum + (w.todayShifts ?? 0),
+    0
+  );
+  const averageRating = workplaces.length
+    ? (
+        workplaces.reduce((sum, w) => sum + (w.rating ?? 0), 0) /
+        workplaces.length
+      ).toFixed(1)
+    : '-';
 
   // --- Recent Activities ---
   const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
@@ -297,22 +313,30 @@ export default function BossDashboard() {
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Quick Stats - ✅ DB 기반 */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-blue-100">
-            <div className="text-3xl font-bold mb-2 text-blue-500">2</div>
+            <div className="text-3xl font-bold mb-2 text-blue-500">
+              {loadingWorkplaces ? '...' : totalWorkplaces}
+            </div>
             <div className="text-gray-600">운영 매장</div>
           </div>
           <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-green-100">
-            <div className="text-3xl font-bold mb-2 text-green-500">20</div>
+            <div className="text-3xl font-bold mb-2 text-green-500">
+              {loadingWorkplaces ? '...' : totalEmployees}
+            </div>
             <div className="text-gray-600">총 직원수</div>
           </div>
           <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-orange-100">
-            <div className="text-3xl font-bold mb-2 text-orange-500">13</div>
+            <div className="text-3xl font-bold mb-2 text-orange-500">
+              {loadingWorkplaces ? '...' : totalTodayWorkers}
+            </div>
             <div className="text-gray-600">오늘 근무자</div>
           </div>
           <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-purple-100">
-            <div className="text-3xl font-bold mb-2 text-purple-500">4.7</div>
+            <div className="text-3xl font-bold mb-2 text-purple-500">
+              {loadingWorkplaces ? '...' : averageRating}
+            </div>
             <div className="text-gray-600">평균 평점</div>
           </div>
         </div>
@@ -364,26 +388,54 @@ export default function BossDashboard() {
                   <span className="mr-3">📈</span>
                   오늘의 현황
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
-                    <h3 className="font-bold text-lg text-gray-800 mb-3">스타벅스 강남점</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">근무자</span>
-                        <span className="font-medium">5명</span>
-                      </div>
-                    </div>
+
+                {/* ✅ DB에서 가져온 workplaces 기반으로 렌더링 */}
+                {loadingWorkplaces ? (
+                  <div className="text-sm text-gray-500">근무지 정보를 불러오는 중입니다…</div>
+                ) : workplaces.length === 0 ? (
+                  <div className="text-sm text-gray-500">
+                    등록된 근무지가 없습니다. <br />
+                    상단 탭의 <span className="font-semibold">🏪 매장 관리</span>에서 매장을 먼저 등록해주세요.
                   </div>
-                  <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
-                    <h3 className="font-bold text-lg text-gray-800 mb-3">맥도날드 홍대점</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">근무자</span>
-                        <span className="font-medium">8명</span>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {workplaces.map((workplace) => (
+                      <div
+                        key={workplace.id}
+                        className="bg-blue-50 rounded-2xl p-6 border border-blue-100"
+                      >
+                        <h3 className="font-bold text-lg text-gray-800 mb-3">
+                          {workplace.name}
+                        </h3>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">오늘 근무자</span>
+                            <span className="font-medium">
+                              {workplace.todayShifts ?? 0}명
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">총 직원 수</span>
+                            <span className="font-medium">
+                              {workplace.employees ?? 0}명
+                            </span>
+                          </div>
+
+                          {workplace.groupCode && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">매장 코드</span>
+                              <span className="font-mono text-xs bg-white px-2 py-1 rounded-lg border border-blue-100">
+                                {workplace.groupCode}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
 
               <BossQuickActions />
@@ -496,42 +548,56 @@ export default function BossDashboard() {
                 <span className="mr-3">👥</span>
                 현재 직원 현황
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
-                  <h4 className="font-bold text-lg text-gray-800 mb-4">스타벅스 강남점</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">총 직원</span>
-                      <span className="font-bold text-blue-600">8명</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">오늘 근무</span>
-                      <span className="font-medium">5명</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">평균 평점</span>
-                      <span className="font-medium">⭐ 4.8</span>
-                    </div>
-                  </div>
+
+              {loadingWorkplaces ? (
+                <div className="text-sm text-gray-500">근무지 정보를 불러오는 중입니다…</div>
+              ) : workplaces.length === 0 ? (
+                <div className="text-sm text-gray-500">
+                  등록된 근무지가 없습니다. 매장을 먼저 등록해주세요.
                 </div>
-                <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
-                  <h4 className="font-bold text-lg text-gray-800 mb-4">맥도날드 홍대점</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">총 직원</span>
-                      <span className="font-bold text-red-600">12명</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">오늘 근무</span>
-                      <span className="font-medium">8명</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">평균 평점</span>
-                      <span className="font-medium">⭐ 4.5</span>
-                    </div>
-                  </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {workplaces.map((workplace) => {
+                    const rating = workplace.rating ?? 0;
+                    return (
+                      <div
+                        key={workplace.id}
+                        className="bg-blue-50 rounded-2xl p-6 border border-blue-100"
+                      >
+                        <h4 className="font-bold text-lg text-gray-800 mb-4">{workplace.name}</h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">총 직원</span>
+                            <span className="font-bold text-blue-600">
+                              {workplace.employees ?? 0}명
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">오늘 근무</span>
+                            <span className="font-medium">
+                              {workplace.todayShifts ?? 0}명
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">평균 평점</span>
+                            <span className="font-medium">
+                              ⭐ {rating.toFixed(1)}
+                            </span>
+                          </div>
+                          {workplace.groupCode && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">매장 코드</span>
+                              <span className="font-mono text-xs bg-white px-2 py-1 rounded-lg border border-blue-100">
+                                {workplace.groupCode}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}

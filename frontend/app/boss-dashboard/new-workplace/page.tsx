@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -13,6 +12,8 @@ export default function NewWorkplace() {
     phone: '',
     description: '',
     operatingHours: {
+      /** ✅ 24시간 상시 운영 여부 */
+      alwaysOpen: false,
       weekday: { open: '09:00', close: '22:00', closed: false },
       weekend: { open: '10:00', close: '21:00', closed: false }
     },
@@ -139,6 +140,33 @@ export default function NewWorkplace() {
         }
       }
     }));
+  };
+
+  /** ✅ 상시 운영 토글 */
+  const toggleAlwaysOpen = () => {
+    setFormData(prev => {
+      const next = !prev.operatingHours.alwaysOpen;
+      if (next) {
+        // 24시간 연중무휴: 평일/주말 모두 00:00 ~ 23:59, 휴무 해제
+        return {
+          ...prev,
+          operatingHours: {
+            ...prev.operatingHours,
+            alwaysOpen: true,
+            weekday: { open: '00:00', close: '23:59', closed: false },
+            weekend: { open: '00:00', close: '23:59', closed: false }
+          }
+        };
+      }
+      // 상시운영 해제 시에는 시간/휴무 상태는 그대로 두고 플래그만 내림
+      return {
+        ...prev,
+        operatingHours: {
+          ...prev.operatingHours,
+          alwaysOpen: false
+        }
+      };
+    });
   };
 
   const toggleBenefit = (benefit: string) => {
@@ -467,7 +495,7 @@ export default function NewWorkplace() {
                   type="text"
                   value={formData.businessRegistration.location}
                   onChange={(e) => handleBusinessRegistrationChange('location', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-5 0 focus:border-transparent text-sm"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   placeholder="자동 추출됩니다"
                   readOnly
                 />
@@ -598,22 +626,49 @@ export default function NewWorkplace() {
             <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
               운영 시간
             </h2>
+
+            {/* ✅ 상시 운영 옵션 */}
+            <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-2xl p-4 border border-gray-200">
+              <div>
+                <p className="font-medium text-gray-800">24시간 상시 운영 (연중무휴)</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  하루 24시간, 휴무 없이 운영하는 매장일 경우 선택하세요.
+                </p>
+              </div>
+              <label className="inline-flex items-center space-x-2 cursor-pointer">
+                <span className="text-sm text-gray-600">상시 운영</span>
+                <input
+                  type="checkbox"
+                  checked={formData.operatingHours.alwaysOpen}
+                  onChange={toggleAlwaysOpen}
+                  className="w-5 h-5 rounded border-gray-300"
+                />
+              </label>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* 평일 */}
               <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-gray-800">평일 (월-금)</h3>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.operatingHours.weekday.closed || false}
-                      onChange={() => toggleDayOff('weekday')}
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-600">휴무</span>
-                  </label>
+                  {!formData.operatingHours.alwaysOpen && (
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.operatingHours.weekday.closed || false}
+                        onChange={() => toggleDayOff('weekday')}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-600">휴무</span>
+                    </label>
+                  )}
                 </div>
-                {!formData.operatingHours.weekday.closed && (
+
+                {formData.operatingHours.alwaysOpen ? (
+                  <div className="text-center py-6 text-gray-600 text-sm">
+                    24시간 상시 운영 (00:00 ~ 23:59)
+                  </div>
+                ) : !formData.operatingHours.weekday.closed ? (
                   <div className="flex items-center space-x-4">
                     <div className="flex-1">
                       <label className="block text-sm text-gray-600 mb-1">오픈</label>
@@ -635,28 +690,35 @@ export default function NewWorkplace() {
                       />
                     </div>
                   </div>
-                )}
-                {formData.operatingHours.weekday.closed && (
+                ) : (
                   <div className="text-center py-8 text-gray-500">
                     평일 휴무
                   </div>
                 )}
               </div>
 
+              {/* 주말 */}
               <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-gray-800">주말 (토-일)</h3>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.operatingHours.weekend.closed || false}
-                      onChange={() => toggleDayOff('weekend')}
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-600">휴무</span>
-                  </label>
+                  {!formData.operatingHours.alwaysOpen && (
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.operatingHours.weekend.closed || false}
+                        onChange={() => toggleDayOff('weekend')}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-600">휴무</span>
+                    </label>
+                  )}
                 </div>
-                {!formData.operatingHours.weekend.closed && (
+
+                {formData.operatingHours.alwaysOpen ? (
+                  <div className="text-center py-6 text-gray-600 text-sm">
+                    24시간 상시 운영 (00:00 ~ 23:59)
+                  </div>
+                ) : !formData.operatingHours.weekend.closed ? (
                   <div className="flex items-center space-x-4">
                     <div className="flex-1">
                       <label className="block text-sm text-gray-600 mb-1">오픈</label>
@@ -678,8 +740,7 @@ export default function NewWorkplace() {
                       />
                     </div>
                   </div>
-                )}
-                {formData.operatingHours.weekend.closed && (
+                ) : (
                   <div className="text-center py-8 text-gray-500">
                     주말 휴무
                   </div>
@@ -717,7 +778,9 @@ export default function NewWorkplace() {
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-500 mt-3">각 요일별로 다른 운영시간을 설정할 수 있습니다</p>
+              <p className="text-xs text-gray-500 mt-3">
+                각 요일별로 다른 운영시간을 설정할 수 있습니다. 상시 운영 매장이라도 예외적으로 다른 시간을 지정할 때 사용할 수 있어요.
+              </p>
             </div>
           </div>
 

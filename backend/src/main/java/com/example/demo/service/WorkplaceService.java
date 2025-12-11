@@ -10,6 +10,8 @@ import com.example.demo.repository.WorkplaceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.demo.entity.WorkInfo;
+import java.util.stream.Collectors;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -158,4 +160,27 @@ public class WorkplaceService {
     public List<Workplace> getAllWorkplaces() {
         return workplaceRepository.findAll();
     }
+
+    // 사장님 근무지 상세 조회
+    public Workplace getWorkplaceDetailForOwner(Long ownerId, Long workplaceId) {
+        Workplace wp = workplaceRepository.findById(workplaceId)
+            .orElseThrow(() -> new RuntimeException("근무지를 찾을 수 없습니다."));
+
+        // owner 체크
+        if (!wp.getUser().getUserId().equals(ownerId)) {
+            throw new RuntimeException("이 근무지에 대한 권한이 없습니다.");
+        }
+
+        return wp;
+    }
+
+    // 직원이 속한 근무지 목록 조회
+    public List<Workplace> getWorkplacesByEmployee(Long userId) {
+        List<WorkInfo> infos = workInfoRepository.findByUserUserId(userId);
+
+        return infos.stream()
+                .map(WorkInfo::getWorkplace)
+                .collect(Collectors.toList());
+    }
+
 }

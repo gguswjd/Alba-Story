@@ -47,11 +47,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // CORS 설정
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 비활성화
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() // 인증 관련 API는 모두 허용
+                .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/auth/**").permitAll()
-                .requestMatchers("/api/test/**").permitAll() // 테스트 API 허용
-                .requestMatchers("/h2-console/**").permitAll() // H2 콘솔 허용
-                .anyRequest().authenticated() // 나머지는 인증 필요
+                .requestMatchers("/api/test/**").permitAll()
+                .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/api/workplace/employee/my").permitAll()  // ← 추가
+                .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())) // H2 콘솔용
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class); // JWT 필터 추가

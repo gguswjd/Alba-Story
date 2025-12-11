@@ -209,4 +209,37 @@ public class WorkplaceController {
             return ResponseEntity.badRequest().body(error);
         }
     }
+
+    // 근무지 상세 조회 (사장님용)
+    @GetMapping("/{workplaceId}")
+    public ResponseEntity<?> getWorkplaceDetail(@PathVariable Long workplaceId, HttpServletRequest request) {
+        try {
+            // 토큰에서 현재 사용자 ID 가져오기
+            Long userId = getUserIdFromToken(request);
+
+            // 현재 유저가 owner인 근무지인지 확인하면서 조회
+            Workplace workplace = workplaceService.getWorkplaceDetailForOwner(userId, workplaceId);
+
+            return ResponseEntity.ok(workplace);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    // 직원의 근무지 목록 조회
+    @GetMapping("/employee/my")
+    public ResponseEntity<?> getMyEmployeeWorkplaces(HttpServletRequest request) {
+        try {
+            Long userId = getUserIdFromToken(request);
+            List<Workplace> workplaces = workplaceService.getWorkplacesByEmployee(userId);
+            return ResponseEntity.ok(workplaces);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
 }

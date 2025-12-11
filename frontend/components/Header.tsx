@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-const TOKEN_KEYS = ['accessToken', 'refreshToken'];
+// 🔧 여기만 수정: 실제로 쓰는 'token'도 함께 지우도록 추가
+const TOKEN_KEYS = ['token', 'accessToken', 'refreshToken'];
 const USER_KEYS = ['user', 'userProfile', 'role', 'rememberMe', 'me'];
 
 function readCookie(name: string) {
@@ -18,7 +19,7 @@ function readCookie(name: string) {
 
 /**
  * localStorage, sessionStorage, 쿠키 중 어디든
- * accessToken / refreshToken 이 하나라도 있으면 true
+ * accessToken / refreshToken / token 이 하나라도 있으면 true
  */
 function anyTokenExists() {
   try {
@@ -70,9 +71,6 @@ export default function Header() {
   const isEmployeeDashboard = pathname?.startsWith('/employee-dashboard');
 
   // 🔗 로고 클릭 시 이동 경로
-  // - 로그인 + employee-dashboard: /employee-dashboard
-  // - 로그인 + boss-dashboard: /boss-dashboard
-  // - 그 외 / 비로그인: /
   let logoHref = '/';
   if (isLoggedIn) {
     if (isEmployeeDashboard) logoHref = '/employee-dashboard';
@@ -109,7 +107,7 @@ export default function Header() {
             <div className="flex items-center">
               <Link href={logoHref} className="flex items-center space-x-3">
                 <Image
-                  src="/logo.png"    // public/logo.png
+                  src="/logo.png"
                   alt="Round 로고"
                   width={500}
                   height={200}

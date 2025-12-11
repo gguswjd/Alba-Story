@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -52,18 +51,48 @@ interface AttendanceRecord {
   status: 'normal' | 'late' | 'early' | 'absent';
 }
 
+// 근무지 가입 요청(WorkJoinRequestResponse)용 타입
+interface JoinRequest {
+  requestId: number;
+  userId: number;
+  userName: string;
+  workplaceId: number;
+  workplaceName: string;
+  status: 'pending' | 'approved' | 'rejected';
+  appliedAt: string;
+  respondedAt?: string | null;
+}
+
+// 백엔드에서 받아온 근무지 정보를 화면용으로 정리한 타입
+interface WorkplaceDetail {
+  id: number | string;
+  name: string;
+  type: string;
+  address: string;
+  phone: string;
+  manager: string;
+  openTime: string;
+  closeTime: string;
+  status: 'active' | 'inactive' | 'pending';
+}
+
 interface WorkplaceManageDetailProps {
   workplaceId: string;
 }
 
-export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: string }) {
+export default function WorkplaceManageDetail({ workplaceId }: WorkplaceManageDetailProps) {
+  // ✅ props로 받은 id가 제대로 오는지 확인
+  console.log('✅ WorkplaceManageDetail props.workplaceId:', workplaceId);
+
   // State variables
   const [activeTab, setActiveTab] = useState('employees');
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<any>(null);
   const [employeeFilter, setEmployeeFilter] = useState<'active' | 'pending'>('active');
+
   const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [employeeToApprove, setEmployeeToApprove] = useState<Employee | null>(null);
+  // 🔁 여기서 Employee → JoinRequest 로 변경
+  const [employeeToApprove, setEmployeeToApprove] = useState<JoinRequest | null>(null);
   const [approvalData, setApprovalData] = useState({
     hourlyWage: '',
     position: '',
@@ -72,10 +101,20 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
 
   // 클라이언트 렌더링 상태 관리
   const [isClient, setIsClient] = useState(false);
-
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // 근무지 / 직원 DB 데이터
+  const [workplace, setWorkplace] = useState<WorkplaceDetail | null>(null);
+  const [isLoadingWorkplace, setIsLoadingWorkplace] = useState(false);
+
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+
+  // 근무지 가입(WorkJoinRequest) 대기 요청 리스트
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+  const [isLoadingJoinRequests, setIsLoadingJoinRequests] = useState(false);
 
   // original state variables used by existing modals
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -155,7 +194,8 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
   const [scheduleSelectedMonth, setScheduleSelectedMonth] = useState(11);
   const [scheduleSelectedYear, setScheduleSelectedYear] = useState(2024);
   const [generatedSchedule, setGeneratedSchedule] = useState<any>({});
-  const [scheduleGenerationStep, setScheduleGenerationStep] = useState<'select' | 'generate' | 'review'>('select');
+  const [scheduleGenerationStep, setScheduleGenerationStep] =
+    useState<'select' | 'generate' | 'review'>('select');
 
   // 클라이언트에서만 현재 날짜 설정
   useEffect(() => {
@@ -168,115 +208,208 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
     }
   }, [isClient]);
 
-  // Original component code integration
-  const [employees, setEmployees] = useState([
-    {
-      id: 1,
-      name: '김민수',
-      position: '매니저',
-      phone: '010-1234-5678',
-      email: 'minsu@example.com',
-      joinDate: '2024-01-15',
-      workDays: 45,
-      status: 'active',
-      hourlyWage: 15000,
-      weeklyHours: 40,
-      overtimeHours: 8,
-      nightShiftHours: 12,
-      holidayHours: 4,
-      avatar:
-        'https://readdy.ai/api/search-image?query=professional%20korean%20male%20manager%20in%20casual%20business%20attire%20smiling%20confidently%20in%20modern%20office%20setting%20with%20clean%20background&width=100&height=100&seq=emp1&orientation=squarish',
-      lastCheckIn: '09:00',
-      lastCheckOut: '18:00',
-      isWorking: true,
-      totalHours: 180,
-      monthlyHours: 160
-    },
-    {
-      id: 2,
-      name: '이지은',
-      position: '직원',
-      phone: '010-2345-6789',
-      email: 'jieun@example.com',
-      joinDate: '2024-02-01',
-      workDays: 38,
-      status: 'active',
-      hourlyWage: 12000,
-      weeklyHours: 35,
-      overtimeHours: 5,
-      nightShiftHours: 8,
-      holidayHours: 2,
-      avatar:
-        'https://readdy.ai/api/search-image?query=friendly%20korean%20female%20employee%20in%20casual%20work%20uniform%20smiling%20warmly%20in%20bright%20workplace%20environment%20with%20simple%20background&width=100&height=100&seq=emp2&orientation=squarish',
-      lastCheckIn: '14:00',
-      lastCheckOut: '-',
-      isWorking: true,
-      totalHours: 140,
-      monthlyHours: 120
-    },
-    {
-      id: 3,
-      name: '박준호',
-      position: '직원',
-      phone: '010-3456-7890',
-      email: 'junho@example.com',
-      joinDate: '2024-02-15',
-      workDays: 32,
-      status: 'active',
-      hourlyWage: 11000,
-      weeklyHours: 30,
-      overtimeHours: 3,
-      nightShiftHours: 6,
-      holidayHours: 0,
-      avatar:
-        'https://readdy.ai/api/search-image?query=young%20korean%20male%20part-time%20worker%20in%20casual%20uniform%20with%20friendly%20expression%20in%20modern%20workplace%20setting%20with%20clean%20background&width=100&height=100&seq=emp3&orientation=squarish',
-      lastCheckIn: '10:00',
-      lastCheckOut: '17:00',
-      isWorking: false,
-      totalHours: 96,
-      monthlyHours: 80
-    },
-    {
-      id: 4,
-      name: '최서연',
-      position: '아르바이트',
-      phone: '010-4567-8901',
-      email: 'seoyeon@example.com',
-      joinDate: '2024-03-01',
-      workDays: 25,
-      status: 'active',
-      hourlyWage: 9620,
-      weeklyHours: 20,
-      overtimeHours: 0,
-      nightShiftHours: 4,
-      holidayHours: 0,
-      avatar:
-        'https://readdy.ai/api/search-image?query=cheerful%20korean%20female%20student%20part-timer%20in%20casual%20work%20attire%20with%20bright%20smile%20in%20clean%20modern%20workplace%20background&width=100&height=100&seq=emp4&orientation=squarish',
-      lastCheckIn: '16:00',
-      lastCheckOut: '-',
-      isWorking: true,
-      totalHours: 50,
-      monthlyHours: 40
-    },
-    { id: 5, name: '정우진', position: '직원', phone: '010-5678-9012', email: 'woojin@example.com', appliedDate: '2024-03-10', workDays: 0, status: 'pending' },
-    { id: 6, name: '강민지', position: '아르바이트', phone: '010-6789-0123', email: 'minji@example.com', appliedDate: '2024-03-15', workDays: 0, status: 'pending' },
-    { id: 7, name: '윤태희', position: '직원', phone: '010-7890-1234', email: 'taehee@example.com', appliedDate: '2024-03-18', workDays: 0, status: 'pending' }
-  ]);
+  /* =========================
+   *   DB 호출해서 데이터 가져오기
+   * ========================= */
 
-  // Mock data - 실제로는 API에서 가져올 데이터
-  const workplace = {
-    id: workplaceId,
-    name: workplaceId === '1' ? '스타벅스 강남점' : '맥도날드 홍대점',
-    type: workplaceId === '1' ? '카페' : '패스트푸드',
-    address: workplaceId === '1' ? '서울시 강남구 테헤란로 123' : '서울시 마포구 홍익로 456',
-    phone: workplaceId === '1' ? '02-1234-5678' : '02-9876-5432',
-    manager: '김사장',
-    openTime: '06:00',
-    closeTime: '22:00',
-    status: 'active'
+  // 근무지 상세 조회
+  const fetchWorkplace = async () => {
+    if (!workplaceId) {
+      console.error('⚠️ fetchWorkplace: workplaceId 없음, 호출 중단');
+      return;
+    }
+
+    console.log('fetchWorkplace workplaceId:', workplaceId);
+    console.log('fetchWorkplace URL:', `/workplaces/${workplaceId}`);
+
+    try {
+      setIsLoadingWorkplace(true);
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+      const res = await fetch(
+        `http://localhost:8080/api/workplace/${encodeURIComponent(workplaceId)}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+      );
+
+      if (!res.ok) {
+        let body: any = null;
+        try {
+          body = await res.json();
+        } catch (_) {}
+
+        console.error('workplace 조회 실패 status:', res.status, body);
+        setWorkplace(null);
+        return;
+      }
+
+      const data = await res.json();
+      // 백엔드 WorkplaceResponse -> 화면용으로 정규화
+      const normalized: WorkplaceDetail = {
+        id: data.workplaceId ?? data.id ?? workplaceId,
+        name: data.workName ?? data.name ?? '이름 없는 매장',
+        type: data.type ?? '매장',
+        address: data.address ?? '',
+        phone: data.phone ?? '',
+        manager: data.ownerName ?? '사장님',
+        openTime: data.openTime ?? '09:00',
+        closeTime: data.closeTime ?? '18:00',
+        status:
+          data.status === 'inactive' || data.status === '휴업'
+            ? 'inactive'
+            : data.status === 'pending'
+            ? 'pending'
+            : 'active'
+      };
+
+      setWorkplace(normalized);
+    } catch (e) {
+      console.error('workplace 조회 중 오류:', e);
+      setWorkplace(null);
+    } finally {
+      setIsLoadingWorkplace(false);
+    }
   };
 
-  // 출퇴근 기록 Mock 데이터
+  // 직원 목록 조회
+  const fetchEmployees = async () => {
+    if (!workplaceId) {
+      console.error('⚠️ fetchEmployees: workplaceId 없음, 호출 중단');
+      return;
+    }
+
+    console.log('fetchEmployees workplaceId:', workplaceId);
+    console.log('fetchEmployees URL:', `/workplaces/${workplaceId}/employees`);
+
+    try {
+      setIsLoadingEmployees(true);
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+      const res = await fetch(
+        `http://localhost:8080/api/workplace/${encodeURIComponent(
+          workplaceId
+        )}/employees`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+      );
+
+      if (!res.ok) {
+        console.error('직원 목록 조회 실패 status:', res.status);
+        setEmployees([]);
+        return;
+      }
+
+      const raw = await res.json();
+      const list: any[] = Array.isArray(raw) ? raw : raw.content ?? raw.data ?? [];
+
+      const mapped: Employee[] = list.map((emp) => ({
+        id: emp.id ?? emp.employeeId,
+        name: emp.user?.name ?? '이름 없음', 
+        position: emp.position ?? '직원',
+        phone: emp.phone ?? '',
+        email: emp.email ?? '',
+        joinDate: emp.joinDate ?? emp.createdAt ?? '',
+        status:
+          emp.status === 'PENDING' || emp.status === 'pending'
+            ? 'pending'
+            : emp.status === 'INACTIVE' || emp.status === 'inactive'
+            ? 'inactive'
+            : 'active',
+        workDays: emp.workDays ?? 0,
+        appliedDate: emp.appliedDate ?? '',
+        hourlyWage: emp.hourlyWage,
+        weeklyHours: emp.weeklyHours ?? 0,
+        overtimeHours: emp.overtimeHours ?? 0,
+        nightShiftHours: emp.nightShiftHours ?? 0,
+        holidayHours: emp.holidayHours ?? 0,
+        avatar: emp.avatar,
+        lastCheckIn: emp.lastCheckIn,
+        lastCheckOut: emp.lastCheckOut,
+        isWorking: emp.isWorking ?? false,
+        totalHours: emp.totalHours,
+        monthlyHours: emp.monthlyHours
+      }));
+
+      setEmployees(mapped);
+    } catch (e) {
+      console.error('직원 목록 조회 중 오류:', e);
+      setEmployees([]);
+    } finally {
+      setIsLoadingEmployees(false);
+    }
+  };
+
+  // 근무지 가입 요청(WorkJoinRequest) 목록 조회
+  const fetchJoinRequests = async () => {
+    if (!workplaceId) {
+      console.error('⚠️ fetchJoinRequests: workplaceId 없음, 호출 중단');
+      return;
+    }
+
+    console.log('fetchJoinRequests workplaceId:', workplaceId);
+    console.log('fetchJoinRequests URL:', `/workplaces/${workplaceId}/requests`);
+
+    try {
+      setIsLoadingJoinRequests(true);
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+      const res = await fetch(
+        `http://localhost:8080/api/workplace/${encodeURIComponent(
+          workplaceId
+        )}/requests`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+      );
+
+      if (!res.ok) {
+        console.error('가입 요청 조회 실패 status:', res.status);
+        setJoinRequests([]);
+        return;
+      }
+
+      const raw = await res.json();
+      const list: any[] = Array.isArray(raw) ? raw : raw.content ?? raw.data ?? [];
+
+      const mapped: JoinRequest[] = list.map((req) => ({
+        requestId: req.requestId ?? req.id,
+        userId: req.userId,
+        userName: req.userName,
+        workplaceId: req.workplaceId,
+        workplaceName: req.workplaceName,
+        status: (req.status?.toLowerCase() ?? 'pending') as JoinRequest['status'],
+        appliedAt: req.appliedAt,
+        respondedAt: req.respondedAt
+      }));
+
+      setJoinRequests(mapped);
+    } catch (e) {
+      console.error('가입 요청 조회 중 오류:', e);
+      setJoinRequests([]);
+    } finally {
+      setIsLoadingJoinRequests(false);
+    }
+  };
+
+  // 모달이 떠 있는 동안 / 또는 진입 시 DB에서 데이터 로드
+  useEffect(() => {
+    if (!isClient) return;
+    if (!workplaceId) {
+      console.error('⚠️ useEffect: workplaceId 없음, fetch 호출 안 함');
+      return;
+    }
+
+    fetchWorkplace();
+    fetchEmployees();
+    fetchJoinRequests(); // 🔥 가입요청도 함께 로드
+  }, [isClient, workplaceId]);
+
+  // 출퇴근 기록 Mock 데이터 (이 부분은 아직 더미 유지)
   const getAttendanceRecords = (employeeId: number): AttendanceRecord[] => {
     return [
       {
@@ -345,6 +478,7 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
     ];
   };
 
+  // 일정/요청은 아직 더미 (스케줄 생성용)
   const scheduleRequests: ScheduleRequest[] = [
     {
       id: 1,
@@ -641,14 +775,14 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
 
     const currentTime = isClient
       ? new Date().toLocaleTimeString('ko-KR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      })
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        })
       : '09:00';
 
-    setEmployees(prevEmployees =>
-      prevEmployees.map(emp => {
+    setEmployees((prevEmployees) =>
+      prevEmployees.map((emp) => {
         if (emp.id === attendanceEmployee.id) {
           if (attendanceAction === 'checkin') {
             return {
@@ -680,7 +814,7 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const schedule: any = {};
 
-    const pendingRequests = scheduleRequests.filter(req => req.status === 'pending');
+    const pendingRequests = scheduleRequests.filter((req) => req.status === 'pending');
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
@@ -707,23 +841,31 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
       }
     }
 
-    pendingRequests.forEach(request => {
-      const employee = activeEmployees.find(emp => emp.id === request.employeeId);
+    const activeEmployees = employees.filter((emp) => emp.status === 'active');
+
+    pendingRequests.forEach((request) => {
+      const employee = activeEmployees.find((emp) => emp.id === request.employeeId);
       if (!employee || !request.requestedDates) return;
 
-      request.requestedDates.forEach(dateStr => {
+      request.requestedDates.forEach((dateStr) => {
         if (schedule[dateStr]) {
           const preferredTimes = request.preferredTimes || [];
 
-          preferredTimes.forEach(timeSlot => {
+          preferredTimes.forEach((timeSlot) => {
             let targetShift = null;
 
             if (timeSlot.includes('오전') || timeSlot.includes('09:00')) {
-              targetShift = schedule[dateStr].shifts.find((s: any) => s.type === 'morning' && !s.employee);
+              targetShift = schedule[dateStr].shifts.find(
+                (s: any) => s.type === 'morning' && !s.employee
+              );
             } else if (timeSlot.includes('오후') || timeSlot.includes('15:00')) {
-              targetShift = schedule[dateStr].shifts.find((s: any) => s.type === 'afternoon' && !s.employee);
+              targetShift = schedule[dateStr].shifts.find(
+                (s: any) => s.type === 'afternoon' && !s.employee
+              );
             } else if (timeSlot.includes('저녁') || timeSlot.includes('야간')) {
-              targetShift = schedule[dateStr].shifts.find((s: any) => s.type === 'night' && !s.employee);
+              targetShift = schedule[dateStr].shifts.find(
+                (s: any) => s.type === 'night' && !s.employee
+              );
             }
 
             if (targetShift) {
@@ -738,12 +880,13 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
       });
     });
 
-    Object.keys(schedule).forEach(dateStr => {
+    Object.keys(schedule).forEach((dateStr) => {
       schedule[dateStr].shifts.forEach((shift: any) => {
         if (!shift.employee) {
-          const availableEmployee = activeEmployees.find(emp => {
-            const alreadyScheduled = schedule[dateStr].shifts.some((s: any) =>
-              s.employee && s.employee.id === emp.id
+          const activeEmployees = employees.filter((emp) => emp.status === 'active');
+          const availableEmployee = activeEmployees.find((emp) => {
+            const alreadyScheduled = schedule[dateStr].shifts.some(
+              (s: any) => s.employee && s.employee.id === emp.id
             );
             return !alreadyScheduled;
           });
@@ -787,39 +930,109 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
 
   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
 
-  const pendingEmployees = employees.filter(emp => emp.status === 'pending');
-  const activeEmployees = employees.filter(emp => emp.status === 'active');
-  const displayedEmployees = employeeFilter === 'pending' ? pendingEmployees : activeEmployees;
+  const pendingEmployees = employees.filter((emp) => emp.status === 'pending');
+  const activeEmployees = employees.filter((emp) => emp.status === 'active');
+  // const displayedEmployees = employeeFilter === 'pending' ? pendingEmployees : activeEmployees;
+  // 🔼 이제 displayedEmployees 대신 employeeFilter에 따라 employees vs joinRequests를 분리 렌더링할 것
+  const pendingJoinRequests = joinRequests.filter((r) => r.status === 'pending');
 
-  // 직원 승인/거절 로직
-  const handleApproveEmployee = (employee: Employee) => {
-    setEmployeeToApprove(employee);
+  // 직원 승인/거절 로직 (근무지 가입 요청 기준)
+  const handleApproveJoinRequest = (request: JoinRequest) => {
+    setEmployeeToApprove(request);
     setApprovalData({
       hourlyWage: '10000',
-      position: employee.position,
+      position: '아르바이트',
       department: '홀 서빙'
     });
     setShowApprovalModal(true);
   };
 
-  const handleRejectEmployee = (employeeId: number) => {
-    console.log('직원 거절:', employeeId);
+  const handleRejectJoinRequest = async (requestId: number) => {
+    if (!workplaceId) return;
+
+    try {
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+      const params = new URLSearchParams({
+        approved: 'false',
+      });
+
+      const res = await fetch(
+        `http://localhost:8080/api/workplace/requests/${requestId}/respond?${params.toString()}`,
+        {
+          method: 'POST',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+        }
+      );
+
+      if (!res.ok) {
+        console.error('직원 거절 실패 status:', res.status);
+        const msg = await res.text();
+        console.error(msg);
+        alert('가입 요청 거절에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        return;
+      }
+
+      setJoinRequests((prev) => prev.filter((r) => r.requestId !== requestId));
+      alert('가입 요청이 거절되었습니다.');
+    } catch (e) {
+      console.error('직원 거절 중 오류:', e);
+      alert('가입 요청 거절 중 오류가 발생했습니다.');
+    }
   };
 
   const handleApprovalDataChange = (field: string, value: string) => {
-    setApprovalData(prev => ({
+    setApprovalData((prev) => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const confirmApproval = () => {
-    if (employeeToApprove) {
-      console.log('직원 승인:', {
-        employee: employeeToApprove,
-        approvalData
+  // 가입 승인
+  const confirmApproval = async () => {
+    if (!employeeToApprove) return;
+
+    try {
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+      // 쿼리스트링 구성
+      const params = new URLSearchParams({
+        approved: 'true',
+        position: approvalData.position,
+        hourlyWage: approvalData.hourlyWage, // 컨트롤러에서 Integer로 자동 변환됨
       });
-      alert(`${employeeToApprove.name}님이 승인되었습니다! 🎉`);
+
+      const res = await fetch(
+        `http://localhost:8080/api/workplace/requests/${employeeToApprove.requestId}/respond?${params.toString()}`,
+        {
+          method: 'POST',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+            // Content-Type 안 줘도 됨 (body 없으니까)
+          },
+        }
+      );
+
+      if (!res.ok) {
+        console.error('직원 승인 실패 status:', res.status);
+        const msg = await res.text();
+        console.error(msg);
+        alert('직원 승인에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        return;
+      }
+
+      await fetchEmployees();
+      await fetchJoinRequests();
+
+      alert(`${employeeToApprove.userName}님이 승인되었습니다! 🎉`);
+    } catch (e) {
+      console.error('직원 승인 중 오류:', e);
+      alert('직원 승인 중 오류가 발생했습니다.');
+    } finally {
       setShowApprovalModal(false);
       setEmployeeToApprove(null);
       setApprovalData({
@@ -829,6 +1042,7 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
       });
     }
   };
+
 
   // 클라이언트에서만 렌더링되도록 확인
   if (!isClient) {
@@ -861,6 +1075,10 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
     );
   }
 
+  const workplaceName =
+    workplace?.name ?? (isLoadingWorkplace ? '매장 정보 불러오는 중...' : '매장 정보 없음');
+  const workplaceStatus = workplace?.status ?? 'pending';
+
   return (
     <div className="min-h-screen bg-white pb-20">
       {/* Header */}
@@ -875,953 +1093,1222 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
                 <i className="ri-arrow-left-line text-gray-600"></i>
               </Link>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">{workplace.name}</h1>
+                <h1 className="text-2xl font-bold text-gray-800">{workplaceName}</h1>
                 <p className="text-gray-600">매장 관리</p>
               </div>
             </div>
             <span
               className={`text-sm px-4 py-2 rounded-full font-medium text-white ${getStatusColor(
-                workplace.status
+                workplaceStatus
               )}`}
             >
-              {getStatusText(workplace.status)}
+              {getStatusText(workplaceStatus)}
             </span>
           </div>
         </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-blue-100">
-            <div className="text-3xl font-bold mb-2 text-blue-500">{activeEmployees.length}</div>
-            <div className="text-gray-600">👥 활성 직원</div>
-          </div>
-          <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-green-100">
-            <div className="text-3xl font-bold mb-2 text-green-500">{activeEmployees.filter(e => e.isWorking).length}</div>
-            <div className="text-gray-600">🟢 현재 근무중</div>
-          </div>
-          <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-orange-100">
-            <div className="text-3xl font-bold mb-2 text-orange-500">{scheduleRequests.filter(r => r.status === 'pending').length}</div>
-            <div className="text-gray-600">⏳ 대기 요청</div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab('employees')}
-              className={`flex-1 py-4 text-center font-medium transition-colors ${
-                activeTab === 'employees' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'
-              }`}
-            >
-              직원 관리
-            </button>
-            <button
-              onClick={() => setActiveTab('attendance')}
-              className={`flex-1 py-4 text-center font-medium transition-colors ${
-                activeTab === 'attendance' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'
-              }`}
-            >
-              출퇴근 관리
-            </button>
-            <button
-              onClick={() => setActiveTab('payroll')}
-              className={`flex-1 py-4 text-center font-medium transition-colors ${
-                activeTab === 'payroll' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'
-              }`}
-            >
-              급여 계산
-            </button>
-            <button
-              onClick={() => setActiveTab('schedule-calendar')}
-              className={`flex-1 py-4 text-center font-medium transition-colors ${
-                activeTab === 'schedule-calendar' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'
-              }`}
-            >
-              스케줄 관리
-            </button>
-            <button
-              onClick={() => setActiveTab('schedule')}
-              className={`flex-1 py-4 text-center font-medium transition-colors ${
-                activeTab === 'schedule' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'
-              }`}
-            >
-              스케줄 요청
-            </button>
-            <button
-              onClick={() => setActiveTab('handover')}
-              className={`flex-1 py-4 text-center font-medium transition-colors ${
-                activeTab === 'handover' ? 'text-teal-600 border-b-2 border-teal-600' : 'text-gray-500'
-              }`}
-            >
-              인수인계
-            </button>
-          </div>
+      <div className="border-b border-gray-200">
+        <div className="flex">
+          <button 
+            onClick={() => setActiveTab('employees')}
+            className={`flex-1 py-4 text-center font-medium transition-colors ${
+              activeTab === 'employees' 
+                ? 'text-teal-600 border-b-2 border-teal-600' 
+                : 'text-gray-500'
+            }`}
+          >
+            직원 관리
+          </button>
+          <button
+            onClick={() => setActiveTab('attendance')}
+            className={`flex-1 py-4 text-center font-medium transition-colors ${
+              activeTab === 'attendance'
+                ? 'text-teal-600 border-b-2 border-teal-600'
+                : 'text-gray-500'
+            }`}
+          >
+            출퇴근 관리
+          </button>
+          <button
+            onClick={() => setActiveTab('payroll')}
+            className={`flex-1 py-4 text-center font-medium transition-colors ${
+              activeTab === 'payroll'
+                ? 'text-teal-600 border-b-2 border-teal-600'
+                : 'text-gray-500'
+            }`}
+          >
+            급여 계산
+          </button>
+          <button
+            onClick={() => setActiveTab('schedule-calendar')}
+            className={`flex-1 py-4 text-center font-medium transition-colors ${
+              activeTab === 'schedule-calendar'
+                ? 'text-teal-600 border-b-2 border-teal-600'
+                : 'text-gray-500'
+            }`}
+          >
+            스케줄 관리
+          </button>
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`flex-1 py-4 text-center font-medium transition-colors ${
+              activeTab === 'schedule'
+                ? 'text-teal-600 border-b-2 border-teal-600'
+                : 'text-gray-500'
+            }`}
+          >
+            스케줄 요청
+          </button>
+          <button
+            onClick={() => setActiveTab('handover')}
+            className={`flex-1 py-4 text-center font-medium transition-colors ${
+              activeTab === 'handover'
+                ? 'text-teal-600 border-b-2 border-teal-600'
+                : 'text-gray-500'
+            }`}
+          >
+            인수인계
+          </button>
         </div>
 
         {/* Tab Content */}
         <div className="p-6">
+
           {/* 직원 관리 탭 */}
           {activeTab === 'employees' && (
             <div>
+
+              {/* 상단 필터 버튼 */}
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">직원 목록</h2>
+
                 <div className="flex gap-2">
                   <button
                     onClick={() => setEmployeeFilter('active')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                      employeeFilter === 'active' ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      employeeFilter === 'active'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
                     활동 중 ({activeEmployees.length})
                   </button>
+
                   <button
                     onClick={() => setEmployeeFilter('pending')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                      employeeFilter === 'pending' ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      employeeFilter === 'pending'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    승인 대기 ({pendingEmployees.length})
+                    승인 대기 ({pendingJoinRequests.length})
                   </button>
                 </div>
               </div>
 
+              {/* 직원 리스트 / 가입 요청 리스트 */}
               <div className="space-y-4">
-                {displayedEmployees.map(employee => (
-                  <div key={employee.id} className="bg-gray-50 rounded-xl p-5 hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
-                          <i className="ri-user-line text-xl text-teal-600"></i>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-bold text-gray-900">{employee.name}</h3>
-                            <span className="text-sm text-gray-500">{employee.position}</span>
-                            {employee.status === 'pending' && (
-                              <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs font-medium rounded-full">
-                                승인 대기
-                              </span>
-                            )}
+                {/* ✅ 활동 중 직원 목록 */}
+                {employeeFilter === 'active' &&
+                  activeEmployees.map((employee) => (
+                    <div
+                      key={employee.id}
+                      className="bg-gray-50 rounded-xl p-5 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+
+                        {/* 좌측 직원 정보 */}
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
+                            <i className="ri-user-line text-xl text-teal-600"></i>
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <span className="flex items-center gap-1">
-                              <i className="ri-phone-line"></i>
-                              {employee.phone}
-                            </span>
-                            {employee.status === 'active' ? (
-                              <>
-                                <span className="flex items-center gap-1">
-                                  <i className="ri-calendar-line"></i>
-                                  입사일: {employee.joinDate}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <i className="ri-time-line"></i>
-                                  근무일: {employee.workDays}일
-                                </span>
-                              </>
-                            ) : (
+
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-bold text-gray-900">{employee.name}</h3>
+                              <span className="text-sm text-gray-500">{employee.position}</span>
+                            </div>
+
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <span className="flex items-center gap-1">
+                                <i className="ri-phone-line"></i>
+                                {employee.phone}
+                              </span>
+
                               <span className="flex items-center gap-1">
                                 <i className="ri-calendar-line"></i>
-                                신청일: {employee.appliedDate}
+                                입사일: {employee.joinDate}
                               </span>
-                            )}
+
+                              <span className="flex items-center gap-1">
+                                <i className="ri-time-line"></i>
+                                근무일: {employee.workDays}일
+                              </span>
+                            </div>
                           </div>
                         </div>
+
+                        {/* 우측 버튼들 */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedEmployee(employee)}
+                            className="w-10 h-10 flex items-center justify-center bg-white rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                          >
+                            <i className="ri-eye-line text-lg text-gray-600"></i>
+                          </button>
+
+                          <button
+                            onClick={() => setDeleteConfirm(employee)}
+                            className="w-10 h-10 flex items-center justify-center bg-white rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                          >
+                            <i className="ri-delete-bin-line text-lg text-red-600"></i>
+                          </button>
+                        </div>
+
                       </div>
-                      <div className="flex items-center gap-2">
-                        {employee.status === 'pending' ? (
-                          <>
+                    </div>
+                  ))}
+
+                {/* ✅ 승인 대기: 근무지 가입 요청 목록 */}
+                {employeeFilter === 'pending' &&
+                  pendingJoinRequests.map((request) => (
+                    <div
+                      key={request.requestId}
+                      className="bg-gray-50 rounded-xl p-5 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+
+                        {/* 좌측 신청자 정보 */}
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                            <i className="ri-user-add-line text-xl text-orange-600"></i>
+                          </div>
+
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-bold text-gray-900">{request.userName}</h3>
+                              <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs font-medium rounded-full">
+                                가입 요청
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <span className="flex items-center gap-1">
+                                <i className="ri-store-2-line"></i>
+                                {request.workplaceName}
+                              </span>
+
+                              <span className="flex items-center gap-1">
+                                <i className="ri-calendar-line"></i>
+                                신청일: {request.appliedAt}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 우측 승인/거절 버튼 */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleApproveJoinRequest(request)}
+                            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors whitespace-nowrap"
+                          >
+                            승인
+                          </button>
+
+                          <button
+                            onClick={() => handleRejectJoinRequest(request.requestId)}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors whitespace-nowrap"
+                          >
+                            거절
+                          </button>
+                        </div>
+
+                      </div>
+                    </div>
+                  ))}
+
+                {/* 직원 / 요청이 없을 때 안내 */}
+                {employeeFilter === 'active' && activeEmployees.length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <i className="ri-user-line text-2xl text-gray-400"></i>
+                    </div>
+
+                    <p className="text-gray-500">등록된 직원이 없습니다</p>
+                  </div>
+                )}
+
+                {employeeFilter === 'pending' && joinRequests.length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <i className="ri-user-add-line text-2xl text-gray-400"></i>
+                    </div>
+
+                    <p className="text-gray-500">승인 대기 중인 가입 요청이 없습니다</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 출퇴근 관리 탭 */}
+        {activeTab === 'attendance' && (
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">출퇴근 관리</h2>
+
+            <div className="space-y-6">
+              {activeEmployees.map((employee) => (
+                <div
+                  key={employee.id}
+                  className="bg-gray-50 rounded-2xl p-6 border border-gray-100"
+                >
+                  <div className="flex items-center justify-between">
+                    {/* 직원 기본 정보 */}
+                    <div className="flex items-center space-x-4">
+                      <div>
+                        <h3 className="font-bold text-gray-800">{employee.name}</h3>
+                        <p className="text-gray-600 text-sm">{employee.position}</p>
+                      </div>
+                    </div>
+
+                    {/* 출퇴근 정보 및 버튼 */}
+                    <div className="flex items-center space-x-6">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-500">출근시간</p>
+                        <p className="font-medium text-green-600">
+                          {employee.lastCheckIn || '-'}
+                        </p>
+                      </div>
+
+                      <div className="text-center">
+                        <p className="text-sm text-gray-500">퇴근시간</p>
+                        <p className="font-medium text-red-600">
+                          {employee.lastCheckOut || '-'}
+                        </p>
+                      </div>
+
+                      <div className="text-center">
+                        <p className="text-sm text-gray-500">상태</p>
+                        <span
+                          className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            employee.isWorking
+                              ? 'bg-green-100 text-green-600'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {employee.isWorking ? '근무중' : '퇴근'}
+                        </span>
+                      </div>
+
+                      <div className="flex space-x-2">
+                        {employee.isWorking ? (
+                          <button
+                            onClick={() => handleAttendanceClick(employee, 'checkout')}
+                            className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            퇴근 처리
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleAttendanceClick(employee, 'checkin')}
+                            className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            출근 처리
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleAttendanceRecordClick(employee)}
+                          className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap"
+                        >
+                          기록 보기
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 급여 계산 탭 */}
+        {activeTab === 'payroll' && (
+          <div className="space-y-8">
+
+            {/* 급여 계산 헤더 */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-purple-100">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                  <i className="ri-money-dollar-circle-line mr-3 text-purple-500"></i>
+                  급여 계산
+                </h2>
+
+                <div className="flex items-center space-x-4">
+
+                  {/* 연도 선택 */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600">연도:</label>
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
+                    >
+                      <option value={2024}>2024년</option>
+                      <option value={2023}>2023년</option>
+                    </select>
+                  </div>
+
+                  {/* 월 선택 */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600">월:</label>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
+                    >
+                      {monthNames.map((month, index) => (
+                        <option key={index} value={index}>
+                          {month}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* 급여 통계 */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+                <div className="bg-blue-50 rounded-2xl p-6 text-center border border-blue-100">
+                  <div className="text-2xl font-bold text-blue-500 mb-2">
+                    ₩{activeEmployees
+                      .reduce((sum, emp) => sum + calculateTotalPay(emp), 0)
+                      .toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600">💰 총 급여</div>
+                </div>
+
+                <div className="bg-green-50 rounded-2xl p-6 text-center border border-green-100">
+                  <div className="text-2xl font-bold text-green-500 mb-2">
+                    {activeEmployees.reduce(
+                      (sum, emp) => sum + (emp.weeklyHours || 0),
+                      0
+                    )}
+                    시간
+                  </div>
+                  <div className="text-sm text-gray-600">⏰ 총 근무시간</div>
+                </div>
+
+                <div className="bg-orange-50 rounded-2xl p-6 text-center border border-orange-100">
+                  <div className="text-2xl font-bold text-orange-500 mb-2">
+                    {activeEmployees.reduce(
+                      (sum, emp) => sum + (emp.overtimeHours || 0),
+                      0
+                    )}
+                    시간
+                  </div>
+                  <div className="text-sm text-gray-600">🕐 연장근무</div>
+                </div>
+
+                <div className="bg-purple-50 rounded-2xl p-6 text-center border border-purple-100">
+                  <div className="text-2xl font-bold text-purple-500 mb-2">
+                    ₩
+                    {activeEmployees
+                      .reduce((sum, emp) => {
+                        const deductions = calculateDeductions(calculateTotalPay(emp));
+                        return sum + deductions.total;
+                      }, 0)
+                      .toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600">📋 총 공제액</div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* 직원별 급여 목록 */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
+              <h3 className="text-xl font-bold text-gray-800 mb-6">직원별 급여 내역</h3>
+
+              <div className="space-y-4">
+                {activeEmployees.map((employee) => {
+                  const totalPay = calculateTotalPay(employee);
+                  const deductions = calculateDeductions(totalPay);
+                  const netPay = totalPay - deductions.total;
+
+                  return (
+                    <div
+                      key={employee.id}
+                      className="bg-gray-50 rounded-2xl p-6 border border-gray-100"
+                    >
+                      <div className="flex items-center justify-between">
+
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                            <i className="ri-user-line text-purple-500 text-xl"></i>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-800">{employee.name}</h4>
+                            <p className="text-gray-600 text-sm">
+                              {employee.position} • 시급 ₩
+                              {employee.hourlyWage?.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-6">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">총 근무시간</p>
+                            <p className="font-bold text-blue-600">
+                              {employee.weeklyHours}시간
+                            </p>
+                          </div>
+
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">총 급여</p>
+                            <p className="font-bold text-green-600">
+                              ₩{totalPay.toLocaleString()}
+                            </p>
+                          </div>
+
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">공제액</p>
+                            <p className="font-bold text-red-600">
+                              ₩{deductions.total.toLocaleString()}
+                            </p>
+                          </div>
+
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">실수령액</p>
+                            <p className="font-bold text-purple-600 text-lg">
+                              ₩{netPay.toLocaleString()}
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => setShowPayrollDetail(employee)}
+                            className="bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            상세보기
+                          </button>
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 급여 계산 기준 가이드 */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-3xl p-8 border border-purple-100">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i className="ri-information-line mr-3 text-purple-500"></i>
+                급여 계산 기준
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-time-line text-blue-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">기본급</span>
+                  </div>
+                  <p className="text-sm text-gray-600">주 40시간 이하 정규 근무시간</p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-add-circle-line text-green-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">연장수당</span>
+                  </div>
+                  <p className="text-sm text-gray-600">시급의 150% (40시간 초과)</p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-moon-line text-purple-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">야간수당</span>
+                  </div>
+                  <p className="text-sm text-gray-600">시급의 50% (22시~06시)</p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-calendar-event-line text-red-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">휴일수당</span>
+                  </div>
+                  <p className="text-sm text-gray-600">시급의 150% (법정공휴일)</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* 스케줄 관리 캘린더 탭 */}
+        {activeTab === 'schedule-calendar' && (
+          <div className="space-y-8">
+            {/* 스케줄 관리 헤더 */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-purple-100">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                  <i className="ri-calendar-schedule-line mr-3 text-purple-500"></i>
+                  스케줄 관리 캘린더
+                </h2>
+
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600">연도:</label>
+                    <select
+                      value={scheduleSelectedYear}
+                      onChange={e => setScheduleSelectedYear(parseInt(e.target.value))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
+                    >
+                      <option value={2024}>2024년</option>
+                      <option value={2025}>2025년</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600">월:</label>
+                    <select
+                      value={scheduleSelectedMonth}
+                      onChange={e => setScheduleSelectedMonth(parseInt(e.target.value))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
+                    >
+                      {monthNames.map((month, index) => (
+                        <option key={index} value={index}>
+                          {month}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={() => setShowScheduleGeneratorModal(true)}
+                    className="bg-purple-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-purple-600 transition-colors cursor-pointer whitespace-nowrap flex items-center"
+                  >
+                    <i className="ri-add-line mr-2"></i>
+                    스케줄 생성
+                  </button>
+                </div>
+              </div>
+
+              {/* 월간 스케줄 캘린더 */}
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                {/* 요일 헤더 */}
+                <div className="grid grid-cols-7 bg-purple-50">
+                  {dayNames.map((day, index) => (
+                    <div
+                      key={day}
+                      className={`p-4 text-center font-medium border-r border-gray-200 last:border-r-0 ${
+                        index === 0
+                          ? 'text-red-500'
+                          : index === 6
+                          ? 'text-blue-500'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 캘린더 그리드 */}
+                <div className="grid grid-cols-7">
+                  {(() => {
+                    const year = scheduleSelectedYear;
+                    const month = scheduleSelectedMonth;
+                    const firstDay = new Date(year, month, 1);
+                    const lastDay = new Date(year, month + 1, 0);
+                    const firstDayOfWeek = firstDay.getDay();
+                    const daysInMonth = lastDay.getDate();
+                    const calendarDays: { date: Date; isCurrentMonth: boolean }[] = [];
+
+                    // 이전 달의 마지막 날들
+                    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                      const date = new Date(firstDay);
+                      date.setDate(date.getDate() - i - 1);
+                      calendarDays.push({ date, isCurrentMonth: false });
+                    }
+
+                    // 현재 달의 날들
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      calendarDays.push({
+                        date: new Date(year, month, day),
+                        isCurrentMonth: true,
+                      });
+                    }
+
+                    // 다음 달의 첫 번째 날들 (42개까지 채우기)
+                    const remainingDays = 42 - calendarDays.length;
+                    for (let day = 1; day <= remainingDays; day++) {
+                      const date = new Date(year, month + 1, day);
+                      calendarDays.push({ date, isCurrentMonth: false });
+                    }
+
+                    return calendarDays.map((dayInfo, index) => {
+                      const { date, isCurrentMonth } = dayInfo;
+                      const dateStr = date.toISOString().split('T')[0];
+                      const isToday = date.toDateString() === new Date().toDateString();
+
+                      // 해당 날짜의 스케줄 데이터 (실제로는 API에서 가져올 데이터)
+                      const daySchedule = (() => {
+                        const dayOfWeek = date.getDay();
+                        if (!isCurrentMonth) return [];
+
+                        // 샘플 스케줄 데이터
+                        const sampleSchedules = [
+                          {
+                            time: '09:00-15:00',
+                            employee: '김민수',
+                            position: '매니저',
+                            type: 'morning',
+                          },
+                          {
+                            time: '15:00-21:00',
+                            employee: '이지은',
+                            position: '직원',
+                            type: 'afternoon',
+                          },
+                          {
+                            time: '21:00-24:00',
+                            employee: '박준호',
+                            position: '직원',
+                            type: 'night',
+                          },
+                        ];
+
+                        // 주말에는 야간 근무 제외
+                        if (dayOfWeek === 0 || dayOfWeek === 6) {
+                          return sampleSchedules.slice(0, 2);
+                        }
+                        return sampleSchedules;
+                      })();
+
+                      return (
+                        <div
+                          key={index}
+                          className={`border-r border-b border-gray-200 p-2 min-h-[120px] ${
+                            isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+                          } ${isToday ? 'bg-blue-50' : ''}`}
+                        >
+                          <div
+                            className={`font-medium mb-2 ${
+                              isToday
+                                ? 'text-blue-600'
+                                : isCurrentMonth
+                                ? index % 7 === 0
+                                  ? 'text-red-500'
+                                  : index % 7 === 6
+                                  ? 'text-blue-500'
+                                  : 'text-gray-800'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {date.getDate()}
+                          </div>
+
+                          {isCurrentMonth && (
+                            <div className="space-y-1">
+                              {daySchedule.map((shift, shiftIndex) => (
+                                <div
+                                  key={shiftIndex}
+                                  className={`text-xs rounded p-1 border ${
+                                    shift.type === 'morning'
+                                      ? 'bg-green-100 text-green-700 border-green-200'
+                                      : shift.type === 'afternoon'
+                                      ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                      : 'bg-purple-100 text-purple-700 border-purple-200'
+                                  }`}
+                                >
+                                  <div className="font-medium">{shift.time}</div>
+                                  <div className="truncate">{shift.employee}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* 범례 */}
+              <div className="flex items-center justify-center space-x-6 mt-6 pt-6 border-t border-gray-100">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                  <span className="text-sm text-gray-600">오전 (09:00-15:00)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                  <span className="text-sm text-gray-600">오후 (15:00-21:00)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+                  <span className="text-sm text-gray-600">야간 (21:00-24:00)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 스케줄 통계 */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-green-100">
+                <div className="text-2xl font-bold text-green-500 mb-2">
+                  {activeEmployees.length * 20}
+                </div>
+                <div className="text-gray-600">📅 이번달 총 시프트</div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-blue-100">
+                <div className="text-2xl font-bold text-blue-500 mb-2">
+                  {activeEmployees.length * 160}
+                </div>
+                <div className="text-gray-600">⏰ 총 근무시간</div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-orange-100">
+                <div className="text-2xl font-bold text-orange-500 mb-2">3</div>
+                <div className="text-gray-600">👥 배정 대기</div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-purple-100">
+                <div className="text-2xl font-bold text-purple-500 mb-2">95%</div>
+                <div className="text-gray-600">📊 배정 완료율</div>
+              </div>
+            </div>
+
+            {/* 직원별 스케줄 요약 */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
+              <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                <i className="ri-team-line mr-3 text-blue-500"></i>
+                직원별 스케줄 요약
+              </h3>
+
+              <div className="space-y-4">
+                {activeEmployees.map(employee => {
+                  // 해당 직원의 월간 스케줄 통계 (샘플 데이터)
+                  const monthlySchedule = {
+                    totalShifts: Math.floor(Math.random() * 10) + 15,
+                    morningShifts: Math.floor(Math.random() * 8) + 5,
+                    afternoonShifts: Math.floor(Math.random() * 8) + 5,
+                    nightShifts: Math.floor(Math.random() * 5) + 2,
+                    totalHours: Math.floor(Math.random() * 50) + 120,
+                  };
+
+                  return (
+                    <div
+                      key={employee.id}
+                      className="bg-gray-50 rounded-2xl p-6 border border-gray-100"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <img
+                            src={employee.avatar}
+                            alt={employee.name}
+                            className="w-12 h-12 rounded-full object-cover object-top"
+                          />
+                          <div>
+                            <h4 className="font-bold text-gray-800">
+                              {employee.name}
+                            </h4>
+                            <p className="text-gray-600 text-sm">
+                              {employee.position}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-6">
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">총 시프트</p>
+                            <p className="font-bold text-purple-600">
+                              {monthlySchedule.totalShifts}회
+                            </p>
+                          </div>
+
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">오전</p>
+                            <p className="font-bold text-green-600">
+                              {monthlySchedule.morningShifts}회
+                            </p>
+                          </div>
+
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">오후</p>
+                            <p className="font-bold text-blue-600">
+                              {monthlySchedule.afternoonShifts}회
+                            </p>
+                          </div>
+
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">야간</p>
+                            <p className="font-bold text-purple-600">
+                              {monthlySchedule.nightShifts}회
+                            </p>
+                          </div>
+
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">총 시간</p>
+                            <p className="font-bold text-gray-800">
+                              {monthlySchedule.totalHours}h
+                            </p>
+                          </div>
+
+                          <button className="bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors cursor-pointer whitespace-nowrap">
+                            수정
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 스케줄 관리 가이드 */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-3xl p-8 border border-purple-100">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i className="ri-lightbulb-line mr-3 text-purple-500"></i>
+                스케줄 관리 팁
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-calendar-check-line text-green-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">균등 배분</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    직원들의 근무시간을 균등하게 배분하여 공정성을 유지하세요
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-time-line text-blue-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">피크타임 관리</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    바쁜 시간대에는 경험 많은 직원을 배치하세요
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-user-heart-line text-purple-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">선호도 반영</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    직원들의 시간대 선호도를 고려하여 만족도를 높이세요
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* 스케줄 요청 탭 */}
+        {activeTab === 'schedule' && (
+          <div className="space-y-8">
+            {/* 스케줄 생성 헤더 */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">스케줄 요청 관리</h2>
+                <button
+                  onClick={() => setShowScheduleGeneratorModal(true)}
+                  className="bg-blue-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap flex items-center"
+                >
+                  <i className="ri-calendar-schedule-line mr-2"></i>
+                  월간 스케줄 생성
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {scheduleRequests.map(request => (
+                  <div
+                    key={request.id}
+                    className="bg-gray-50 rounded-2xl p-6 border border-gray-100"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                          <i className="ri-calendar-line text-blue-500 text-xl"></i>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center space-x-3 mb-1">
+                            <h3 className="font-bold text-gray-800">
+                              {request.employeeName}
+                            </h3>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${getRequestTypeColor(
+                                request.requestType,
+              )}`}
+                            >
+                              {getRequestTypeText(request.requestType)}
+                            </span>
+                          </div>
+
+                          <p className="text-gray-600 text-sm mb-1">
+                            요청 날짜: {request.requestedDates?.length}일 (
+                            {request.requestedDates
+                              ?.slice(0, 2)
+                              .map(date => new Date(date).getDate())
+                              .join(', ')}
+                            일
+                            {request.requestedDates &&
+                            request.requestedDates.length > 2
+                              ? ` 외 ${request.requestedDates.length - 2}일`
+                              : ''}
+                            )
+                          </p>
+
+                          <p className="text-gray-500 text-sm">{request.reason}</p>
+
+                          {request.message && (
+                            <p className="text-blue-600 text-sm mt-1">
+                              💬 {request.message}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xs text-gray-400">
+                          {request.requestDate}
+                        </span>
+
+                        {request.status === 'pending' ? (
+                          <div className="flex space-x-2">
                             <button
-                              onClick={() => handleApproveEmployee(employee)}
-                              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors whitespace-nowrap"
+                              onClick={() =>
+                                handleScheduleAction(request.id, 'approve')
+                              }
+                              className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors whitespace-nowrap"
                             >
                               승인
                             </button>
+
                             <button
-                              onClick={() => handleRejectEmployee(employee.id)}
-                              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors whitespace-nowrap"
+                              onClick={() =>
+                                handleScheduleAction(request.id, 'reject')
+                              }
+                              className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors whitespace-nowrap"
                             >
                               거절
                             </button>
-                          </>
+                          </div>
                         ) : (
-                          <>
-                            <button
-                              onClick={() => setSelectedEmployee(employee)}
-                              className="w-10 h-10 flex items-center justify-center bg-white rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
-                            >
-                              <i className="ri-eye-line text-lg text-gray-600"></i>
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirm(employee)}
-                              className="w-10 h-10 flex items-center justify-center bg-white rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                            >
-                              <i className="ri-delete-bin-line text-lg text-red-600"></i>
-                            </button>
-                          </>
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              request.status === 'approved'
+                                ? 'bg-green-100 text-green-600'
+                                : 'bg-red-100 text-red-600'
+                            }`}
+                          >
+                            {request.status === 'approved' ? '승인됨' : '거절됨'}
+                          </span>
                         )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
 
-              {displayedEmployees.length === 0 && (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i className="ri-user-line text-2xl text-gray-400"></i>
+            {/* 스케줄 생성 가이드 */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl p-8 border border-blue-100">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i className="ri-lightbulb-line mr-3 text-blue-500"></i>
+                스케줄 생성 가이드
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-calendar-check-line text-green-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">균등 배분</span>
                   </div>
-                  <p className="text-gray-5">
-                    {employeeFilter === 'pending' ? '승인 대기 중인 직원이 없습니다' : '등록된 직원이 없습니다'}
+                  <p className="text-sm text-gray-600">
+                    직원들의 근무시간을 균등하게 배분하여 공정성을 유지하세요
                   </p>
                 </div>
-              )}
-            </div>
-          )}
 
-          {/* 출퇴근 관리 탭 */}
-          {activeTab === 'attendance' && (
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-time-line text-blue-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">피크타임 관리</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    바쁜 시간대에는 경험 많은 직원을 배치하세요
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-user-heart-line text-purple-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">선호도 반영</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    직원들의 시간대 선호도를 고려하여 만족도를 높이세요
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 인수인계 탭 */}
+        {activeTab === 'handover' && (
+          <div className="space-y-8">
+
+            {/* 새 인수인계 작성 */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">출퇴근 관리</h2>
+              <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                <i className="ri-edit-line mr-3 text-blue-500"></i>
+                매니저 공지사항 작성
+              </h3>
 
-              <div className="space-y-6">
-                {activeEmployees.map(employee => (
-                  <div key={employee.id} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <img
-                          src={employee.avatar}
-                          alt={employee.name}
-                          className="w-12 h-12 rounded-full object-cover object-top"
-                        />
-                        <div>
-                          <h3 className="font-bold text-gray-800">{employee.name}</h3>
-                          <p className="text-gray-600 text-sm">{employee.position}</p>
-                        </div>
-                      </div>
+              <div className="space-y-4">
+                <textarea
+                  value={newHandover}
+                  onChange={e => setNewHandover(e.target.value)}
+                  placeholder="직원들에게 전달할 공지사항이나 업무 지시사항을 작성해주세요..."
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                  rows={4}
+                  maxLength={500}
+                />
 
-                      <div className="flex items-center space-x-6">
-                        <div className="text-center">
-                          <p className="text-sm text-gray-500">출근시간</p>
-                          <p className="font-medium text-green-600">{employee.lastCheckIn || '-'}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-gray-500">퇴근시간</p>
-                          <p className="font-medium text-red-600">{employee.lastCheckOut || '-'}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-gray-500">상태</p>
-                          <span
-                            className={`px-3 py-1 rounded-full text-sm font-medium ${
-                              employee.isWorking ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {employee.isWorking ? '근무중' : '퇴근'}
-                          </span>
-                        </div>
-                        <div className="flex space-x-2">
-                          {employee.isWorking ? (
-                            <button
-                              onClick={() => handleAttendanceClick(employee, 'checkout')}
-                              className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors cursor-pointer whitespace-nowrap"
-                            >
-                              퇴근 처리
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleAttendanceClick(employee, 'checkin')}
-                              className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors cursor-pointer whitespace-nowrap"
-                            >
-                              출근 처리
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => handleAttendanceRecordClick(employee)}
-                            className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap"
-                          >
-                            기록 보기
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-500">{newHandover.length}/500자</p>
 
-          {/* 급여 계산 탭 */}
-          {activeTab === 'payroll' && (
-            <div className="space-y-8">
-              {/* 급여 계산 헤더 */}
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-purple-100">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <i className="ri-money-dollar-circle-line mr-3 text-purple-500"></i>
-                    급여 계산
-                  </h2>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm text-gray-600">연도:</label>
-                      <select
-                        value={selectedYear}
-                        onChange={e => setSelectedYear(parseInt(e.target.value))}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
-                      >
-                        <option value={2024}>2024년</option>
-                        <option value={2023}>2023년</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm text-gray-600">월:</label>
-                      <select
-                        value={selectedMonth}
-                        onChange={e => setSelectedMonth(parseInt(e.target.value))}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
-                      >
-                        {monthNames.map((month, index) => (
-                          <option key={index} value={index}>
-                            {month}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 급여 통계 */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="bg-blue-50 rounded-2xl p-6 text-center border border-blue-100">
-                    <div className="text-2xl font-bold text-blue-500 mb-2">₩{activeEmployees.reduce((sum, emp) => sum + calculateTotalPay(emp), 0).toLocaleString()}</div>
-                    <div className="text-sm text-gray-600">💰 총 급여</div>
-                  </div>
-                  <div className="bg-green-50 rounded-2xl p-6 text-center border border-green-100">
-                    <div className="text-2xl font-bold text-green-500 mb-2">{activeEmployees.reduce((sum, emp) => sum + (emp.weeklyHours || 0), 0)}시간</div>
-                    <div className="text-sm text-gray-600">⏰ 총 근무시간</div>
-                  </div>
-                  <div className="bg-orange-50 rounded-2xl p-6 text-center border border-orange-100">
-                    <div className="text-2xl font-bold text-orange-500 mb-2">{activeEmployees.reduce((sum, emp) => sum + (emp.overtimeHours || 0), 0)}시간</div>
-                    <div className="text-sm text-gray-600">🕐 연장근무</div>
-                  </div>
-                  <div className="bg-purple-50 rounded-2xl p-6 text-center border border-purple-100">
-                    <div className="text-2xl font-bold text-purple-500 mb-2">₩{activeEmployees.reduce((sum, emp) => {
-                      const deductions = calculateDeductions(calculateTotalPay(emp));
-                      return sum + deductions.total;
-                    }, 0).toLocaleString()}</div>
-                    <div className="text-sm text-gray-600">📋 총 공제액</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 직원별 급여 목록 */}
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-6">직원별 급여 내역</h3>
-
-                <div className="space-y-4">
-                  {activeEmployees.map(employee => {
-                    const totalPay = calculateTotalPay(employee);
-                    const deductions = calculateDeductions(totalPay);
-                    const netPay = totalPay - deductions.total;
-
-                    return (
-                      <div key={employee.id} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                              <i className="ri-user-line text-purple-500 text-xl"></i>
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-gray-800">{employee.name}</h4>
-                              <p className="text-gray-600 text-sm">{employee.position} • 시급 ₩{employee.hourlyWage?.toLocaleString()}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-6">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">총 근무시간</p>
-                              <p className="font-bold text-blue-600">{employee.weeklyHours}시간</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">총 급여</p>
-                              <p className="font-bold text-green-600">₩{totalPay.toLocaleString()}</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">공제액</p>
-                              <p className="font-bold text-red-600">₩{deductions.total.toLocaleString()}</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">실수령액</p>
-                              <p className="font-bold text-purple-600 text-lg">₩{netPay.toLocaleString()}</p>
-                            </div>
-                            <button
-                              onClick={() => setShowPayrollDetail(employee)}
-                              className="bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors cursor-pointer whitespace-nowrap"
-                            >
-                              상세보기
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 급여 계산 가이드 */}
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-3xl p-8 border border-purple-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                  <i className="ri-information-line mr-3 text-purple-500"></i>
-                  급여 계산 기준
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-time-line text-blue-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">기본급</span>
-                    </div>
-                    <p className="text-sm text-gray-600">주 40시간 이하 정규 근무시간</p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-add-circle-line text-green-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">연장수당</span>
-                    </div>
-                    <p className="text-sm text-gray-600">시급의 150% (40시간 초과)</p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-moon-line text-purple-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">야간수당</span>
-                    </div>
-                    <p className="text-sm text-gray-600">시급의 50% (22시~06시)</p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-calendar-event-line text-red-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">휴일수당</span>
-                    </div>
-                    <p className="text-sm text-gray-600">시급의 150% (법정공휴일)</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 스케줄 관리 캘린더 탭 */}
-          {activeTab === 'schedule-calendar' && (
-            <div className="space-y-8">
-              {/* 스케줄 관리 헤더 */}
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-purple-100">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <i className="ri-calendar-schedule-line mr-3 text-purple-500"></i>
-                    스케줄 관리 캘린더
-                  </h2>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm text-gray-600">연도:</label>
-                      <select
-                        value={scheduleSelectedYear}
-                        onChange={e => setScheduleSelectedYear(parseInt(e.target.value))}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
-                      >
-                        <option value={2024}>2024년</option>
-                        <option value={2025}>2025년</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm text-gray-600">월:</label>
-                      <select
-                        value={scheduleSelectedMonth}
-                        onChange={e => setScheduleSelectedMonth(parseInt(e.target.value))}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-8"
-                      >
-                        {monthNames.map((month, index) => (
-                          <option key={index} value={index}>
-                            {month}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      onClick={() => setShowScheduleGeneratorModal(true)}
-                      className="bg-purple-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-purple-600 transition-colors cursor-pointer whitespace-nowrap flex items-center"
-                    >
-                      <i className="ri-add-line mr-2"></i>
-                      스케줄 생성
-                    </button>
-                  </div>
-                </div>
-
-                {/* 월간 스케줄 캘린더 */}
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-                  {/* 요일 헤더 */}
-                  <div className="grid grid-cols-7 bg-purple-50">
-                    {dayNames.map((day, index) => (
-                      <div key={day} className={`p-4 text-center font-medium border-r border-gray-200 last:border-r-0 ${
-                        index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-700'
-                      }`}>
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 캘린더 그리드 */}
-                  <div className="grid grid-cols-7">
-                    {(() => {
-                      const year = scheduleSelectedYear;
-                      const month = scheduleSelectedMonth;
-                      const firstDay = new Date(year, month, 1);
-                      const lastDay = new Date(year, month + 1, 0);
-                      const firstDayOfWeek = firstDay.getDay();
-                      const daysInMonth = lastDay.getDate();
-                      
-                      const calendarDays = [];
-                      
-                      // 이전 달의 마지막 날들
-                      for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-                        const date = new Date(firstDay);
-                        date.setDate(date.getDate() - i - 1);
-                        calendarDays.push({ date, isCurrentMonth: false });
-                      }
-                      
-                      // 현재 달의 날들
-                      for (let day = 1; day <= daysInMonth; day++) {
-                        calendarDays.push({ 
-                          date: new Date(year, month, day), 
-                          isCurrentMonth: true 
-                        });
-                      }
-                      
-                      // 다음 달의 첫 번째 날들 (42개까지 채우기)
-                      const remainingDays = 42 - calendarDays.length;
-                      for (let day = 1; day <= remainingDays; day++) {
-                        const date = new Date(year, month + 1, day);
-                        calendarDays.push({ date, isCurrentMonth: false });
-                      }
-
-                      return calendarDays.map((dayInfo, index) => {
-                        const { date, isCurrentMonth } = dayInfo;
-                        const dateStr = date.toISOString().split('T')[0];
-                        const isToday = date.toDateString() === new Date().toDateString();
-                        
-                        // 해당 날짜의 스케줄 데이터 (실제로는 API에서 가져올 데이터)
-                        const daySchedule = (() => {
-                          const dayOfWeek = date.getDay();
-                          if (!isCurrentMonth) return [];
-                          
-                          // 샘플 스케줄 데이터
-                          const sampleSchedules = [
-                            { time: '09:00-15:00', employee: '김민수', position: '매니저', type: 'morning' },
-                            { time: '15:00-21:00', employee: '이지은', position: '직원', type: 'afternoon' },
-                            { time: '21:00-24:00', employee: '박준호', position: '직원', type: 'night' }
-                          ];
-                          
-                          // 주말에는 야간 근무 제외
-                          if (dayOfWeek === 0 || dayOfWeek === 6) {
-                            return sampleSchedules.slice(0, 2);
-                          }
-                          
-                          return sampleSchedules;
-                        })();
-
-                        return (
-                          <div 
-                            key={index} 
-                            className={`border-r border-b border-gray-200 last:border-r-0 p-2 min-h-[120px] ${
-                              isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-                            } ${isToday ? 'bg-blue-50' : ''}`}
-                          >
-                            <div className={`font-medium mb-2 ${
-                              isToday ? 'text-blue-600' : 
-                              isCurrentMonth ? 
-                                index % 7 === 0 ? 'text-red-500' : 
-                                index % 7 === 6 ? 'text-blue-500' : 'text-gray-800'
-                              : 'text-gray-400'
-                            }`}>
-                              {date.getDate()}
-                            </div>
-                            
-                            {isCurrentMonth && (
-                              <div className="space-y-1">
-                                {daySchedule.map((shift, shiftIndex) => (
-                                  <div 
-                                    key={shiftIndex} 
-                                    className={`text-xs rounded p-1 border ${
-                                      shift.type === 'morning' ? 'bg-green-100 text-green-700 border-green-200' :
-                                      shift.type === 'afternoon' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                      'bg-purple-100 text-purple-700 border-purple-200'
-                                    }`}
-                                  >
-                                    <div className="font-medium">{shift.time}</div>
-                                    <div className="truncate">{shift.employee}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-
-                {/* 범례 */}
-                <div className="flex items-center justify-center space-x-6 mt-6 pt-6 border-t border-gray-100">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                    <span className="text-sm text-gray-600">오전 (09:00-15:00)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                    <span className="text-sm text-gray-600">오후 (15:00-21:00)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                    <span className="text-sm text-gray-600">야간 (21:00-24:00)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 스케줄 통계 */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-green-100">
-                  <div className="text-2xl font-bold text-green-500 mb-2">{activeEmployees.length * 20}</div>
-                  <div className="text-gray-600">📅 이번달 총 시프트</div>
-                </div>
-                <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-blue-100">
-                  <div className="text-2xl font-bold text-blue-500 mb-2">{activeEmployees.length * 160}</div>
-                  <div className="text-gray-600">⏰ 총 근무시간</div>
-                </div>
-                <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-orange-100">
-                  <div className="text-2xl font-bold text-orange-500 mb-2">3</div>
-                  <div className="text-gray-600">👥 배정 대기</div>
-                </div>
-                <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-purple-100">
-                  <div className="text-2xl font-bold text-purple-500 mb-2">95%</div>
-                  <div className="text-gray-600">📊 배정 완료율</div>
-                </div>
-              </div>
-
-              {/* 직원별 스케줄 요약 */}
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                  <i className="ri-team-line mr-3 text-blue-500"></i>
-                  직원별 스케줄 요약
-                </h3>
-
-                <div className="space-y-4">
-                  {activeEmployees.map(employee => {
-                    // 해당 직원의 월간 스케줄 통계 (샘플 데이터)
-                    const monthlySchedule = {
-                      totalShifts: Math.floor(Math.random() * 10) + 15,
-                      morningShifts: Math.floor(Math.random() * 8) + 5,
-                      afternoonShifts: Math.floor(Math.random() * 8) + 5,
-                      nightShifts: Math.floor(Math.random() * 5) + 2,
-                      totalHours: Math.floor(Math.random() * 50) + 120
-                    };
-
-                    return (
-                      <div key={employee.id} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <img
-                              src={employee.avatar}
-                              alt={employee.name}
-                              className="w-12 h-12 rounded-full object-cover object-top"
-                            />
-                            <div>
-                              <h4 className="font-bold text-gray-800">{employee.name}</h4>
-                              <p className="text-gray-600 text-sm">{employee.position}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-6">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">총 시프트</p>
-                              <p className="font-bold text-purple-600">{monthlySchedule.totalShifts}회</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">오전</p>
-                              <p className="font-bold text-green-600">{monthlySchedule.morningShifts}회</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">오후</p>
-                              <p className="font-bold text-blue-600">{monthlySchedule.afternoonShifts}회</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">야간</p>
-                              <p className="font-bold text-purple-600">{monthlySchedule.nightShifts}회</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500">총 시간</p>
-                              <p className="font-bold text-gray-800">{monthlySchedule.totalHours}h</p>
-                            </div>
-                            <button className="bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors cursor-pointer whitespace-nowrap">
-                              수정
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 스케줄 관리 가이드 */}
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-3xl p-8 border border-purple-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                  <i className="ri-lightbulb-line mr-3 text-purple-500"></i>
-                  스케줄 관리 팁
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-calendar-check-line text-green-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">균등 배분</span>
-                    </div>
-                    <p className="text-sm text-gray-600">직원들의 근무시간을 균등하게 배분하여 공정성을 유지하세요</p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-time-line text-blue-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">피크타임 관리</span>
-                    </div>
-                    <p className="text-sm text-gray-600">바쁜 시간대에는 경험 많은 직원을 배치하세요</p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-user-heart-line text-purple-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">선호도 반영</span>
-                    </div>
-                    <p className="text-sm text-gray-600">직원들의 시간대 선호도를 고려하여 만족도를 높이세요</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 스케줄 요청 탭 */}
-          {activeTab === 'schedule' && (
-            <div className="space-y-8">
-              {/* 스케줄 생성 헤더 */}
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">스케줄 요청 관리</h2>
                   <button
-                    onClick={() => setShowScheduleGeneratorModal(true)}
-                    className="bg-blue-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap flex items-center"
+                    onClick={addHandoverNote}
+                    disabled={!newHandover.trim()}
+                    className="px-6 py-2 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
-                    <i className="ri-calendar-schedule-line mr-2"></i>
-                    월간 스케줄 생성
+                    <i className="ri-send-plane-line mr-2"></i>
+                    등록하기
                   </button>
                 </div>
+              </div>
+            </div>
 
+            {/* 인수인계 목록 */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-green-100">
+              <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                <i className="ri-file-list-line mr-3 text-green-500"></i>
+                인수인계 및 공지사항
+              </h3>
+
+              {handoverNotes.length === 0 ? (
+                <div className="text-center py-12">
+                  <i className="ri-file-list-line text-4xl text-gray-300 mb-4"></i>
+                  <p className="text-gray-500">아직 인수인계 내역이 없습니다.</p>
+                </div>
+              ) : (
                 <div className="space-y-4">
-                  {scheduleRequests.map(request => (
-                    <div key={request.id} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                            <i className="ri-calendar-line text-blue-500 text-xl"></i>
-                          </div>
-                          <div>
-                            <div className="flex items-center space-x-3 mb-1">
-                              <h3 className="font-bold text-gray-800">{request.employeeName}</h3>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRequestTypeColor(request.requestType)}`}>
-                                {getRequestTypeText(request.requestType)}
-                              </span>
-                            </div>
-                            <p className="text-gray-600 text-sm mb-1">
-                              요청 날짜: {request.requestedDates?.length}일 
-                              ({request.requestedDates?.slice(0, 2).map(date => new Date(date).getDate()).join(', ')}일 
-                              {request.requestedDates && request.requestedDates.length > 2 ? ` 외 ${request.requestedDates.length - 2}일` : ''})
-                            </p>
-                            <p className="text-gray-500 text-sm">{request.reason}</p>
-                            {request.message && (
-                              <p className="text-blue-600 text-sm mt-1">💬 {request.message}</p>
-                            )}
-                          </div>
+                  {handoverNotes.map(note => (
+                    <div
+                      key={note.id}
+                      className={`rounded-2xl p-6 border ${getHandoverTypeColor(
+                        note.type,
+                      )}`}
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                          <i
+                            className={`${getHandoverTypeIcon(
+                              note.type,
+                            )} text-xl`}
+                          ></i>
                         </div>
 
-                        <div className="flex items-center space-x-3">
-                          <span className="text-xs text-gray-400">{request.requestDate}</span>
-                          {request.status === 'pending' ? (
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => handleScheduleAction(request.id, 'approve')}
-                                className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors whitespace-nowrap"
-                              >
-                                승인
-                              </button>
-                              <button
-                                onClick={() => handleScheduleAction(request.id, 'reject')}
-                                className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors whitespace-nowrap"
-                              >
-                                거절
-                              </button>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-bold text-gray-800">
+                                  {note.author}
+                                </span>
+                                {note.isManager && (
+                                  <span className="px-2 py-1 bg-purple-100 text-purple-600 text-xs font-medium rounded-full">
+                                    매니저
+                                  </span>
+                                )}
+                              </div>
+
+                              <span className="text-sm text-gray-500">
+                                {note.shift}
+                              </span>
                             </div>
-                          ) : (
-                            <span
-                              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                request.status === 'approved' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                              }`}
-                            >
-                              {request.status === 'approved' ? '승인됨' : '거절됨'}
-                            </span>
-                          )}
+
+                            <span className="text-sm text-gray-500">{note.time}</span>
+                          </div>
+
+                          <p className="text-gray-700 leading-relaxed">
+                            {note.content}
+                          </p>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
+            </div>
 
-              {/* 스케줄 생성 가이드 */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl p-8 border border-blue-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                  <i className="ri-lightbulb-line mr-3 text-blue-500"></i>
-                  스케줄 생성 가이드
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-calendar-check-line text-green-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">균등 배분</span>
-                    </div>
-                    <p className="text-sm text-gray-600">직원들의 근무시간을 균등하게 배분하여 공정성을 유지하세요</p>
+            {/* 인수인계 가이드 */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-3xl p-8 border border-purple-100">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i className="ri-lightbulb-line mr-3 text-purple-500"></i>
+                매니저 공지사항 작성 가이드
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-information-line text-blue-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">업무 안내</span>
                   </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-time-line text-blue-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">피크타임 관리</span>
-                    </div>
-                    <p className="text-sm text-gray-600">바쁜 시간대에는 경험 많은 직원을 배치하세요</p>
+                  <p className="text-sm text-gray-600">
+                    새로운 메뉴, 정책 변경, 교육 내용 등
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-alert-line text-orange-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">중요 공지</span>
                   </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-user-heart-line text-purple-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">선호도 반영</span>
-                    </div>
-                    <p className="text-sm text-gray-600">직원들의 시간대 선호도를 고려하여 만족도를 높이세요</p>
+                  <p className="text-sm text-gray-600">
+                    점검 일정, 안전 수칙, 긴급 사항 등
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4">
+                  <div className="flex items-center mb-3">
+                    <i className="ri-task-line text-green-500 mr-2"></i>
+                    <span className="font-medium text-gray-800">업무 지시</span>
                   </div>
+                  <p className="text-sm text-gray-600">
+                    특별 업무, 목표 달성, 개선 사항 등
+                  </p>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* 인수인계 탭 */}
-          {activeTab === 'handover' && (
-            <div className="space-y-8">
-              {/* 새 인수인계 작성 */}
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                  <i className="ri-edit-line mr-3 text-blue-500"></i>
-                  매니저 공지사항 작성
-                </h3>
-                <div className="space-y-4">
-                  <textarea
-                    value={newHandover}
-                    onChange={e => setNewHandover(e.target.value)}
-                    placeholder="직원들에게 전달할 공지사항이나 업무 지시사항을 작성해주세요..."
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
-                    rows={4}
-                    maxLength={500}
-                  />
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-500">{newHandover.length}/500자</p>
-                    <button
-                      onClick={addHandoverNote}
-                      disabled={!newHandover.trim()}
-                      className="px-6 py-2 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      <i className="ri-send-plane-line mr-2"></i>
-                      등록하기
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 인수인계 목록 */}
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-green-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                  <i className="ri-file-list-line mr-3 text-green-500"></i>
-                  인수인계 및 공지사항
-                </h3>
-
-                {handoverNotes.length === 0 ? (
-                  <div className="text-center py-12">
-                    <i className="ri-file-list-line text-4xl text-gray-300 mb-4"></i>
-                    <p className="text-gray-500">아직 인수인계 내역이 없습니다.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {handoverNotes.map(note => (
-                      <div key={note.id} className={`rounded-2xl p-6 border ${getHandoverTypeColor(note.type)}`}>
-                        <div className="flex items-start space-x-4">
-                          <div className="flex-shrink-0">
-                            <i className={`${getHandoverTypeIcon(note.type)} text-xl`}></i>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex items-center space-x-2">
-                                  <span className="font-bold text-gray-800">{note.author}</span>
-                                  {note.isManager && (
-                                    <span className="px-2 py-1 bg-purple-100 text-purple-600 text-xs font-medium rounded-full">
-                                      매니저
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="text-sm text-gray-500">{note.shift}</span>
-                              </div>
-                              <span className="text-sm text-gray-500">{note.time}</span>
-                            </div>
-                            <p className="text-gray-700 leading-relaxed">{note.content}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 인수인계 가이드 */}
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-3xl p-8 border border-purple-100">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                  <i className="ri-lightbulb-line mr-3 text-purple-500"></i>
-                  매니저 공지사항 작성 가이드
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-information-line text-blue-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">업무 안내</span>
-                    </div>
-                    <p className="text-sm text-gray-600">새로운 메뉴, 정책 변경, 교육 내용 등</p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-alert-line text-orange-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">중요 공지</span>
-                    </div>
-                    <p className="text-sm text-gray-600">점검 일정, 안전 수칙, 긴급 사항 등</p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-4">
-                    <div className="flex items-center mb-3">
-                      <i className="ri-task-line text-green-500 mr-2"></i>
-                      <span className="font-medium text-gray-800">업무 지시</span>
-                    </div>
-                    <p className="text-sm text-gray-600">특별 업무, 목표 달성, 개선 사항 등</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+      
       </div>
 
       {/* 출퇴근 처리 모달 */}
@@ -1831,25 +2318,35 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
             <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
               {attendanceAction === 'checkin' ? '출근 처리' : '퇴근 처리'}
             </h3>
+
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i className="ri-user-line text-blue-500 text-2xl"></i>
               </div>
-              <h4 className="font-bold text-lg text-gray-800">{attendanceEmployee.name}</h4>
+              <h4 className="font-bold text-lg text-gray-800">
+                {attendanceEmployee.name}
+              </h4>
               <p className="text-gray-600">{attendanceEmployee.position}</p>
+
               <div className="mt-4 p-4 bg-gray-50 rounded-xl">
                 <p className="text-sm text-gray-600 mb-2">
                   {attendanceAction === 'checkin' ? '출근 시간' : '퇴근 시간'}
                 </p>
-                <p className="text-lg font-bold text-blue-600" suppressHydrationWarning={true}>
-                  {isClient ? new Date().toLocaleTimeString('ko-KR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                  }) : '09:00'}
+                <p
+                  className="text-lg font-bold text-blue-600"
+                  suppressHydrationWarning={true}
+                >
+                  {isClient
+                    ? new Date().toLocaleTimeString('ko-KR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                      })
+                    : '09:00'}
                 </p>
               </div>
             </div>
+
             <div className="flex space-x-4">
               <button
                 onClick={() => setShowAttendanceModal(false)}
@@ -1886,33 +2383,53 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
 
             <div className="space-y-4">
               {getAttendanceRecords(attendanceRecordEmployee.id).map(record => (
-                <div key={record.id} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                <div
+                  key={record.id}
+                  className="bg-gray-50 rounded-2xl p-6 border border-gray-100"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="text-center">
                         <p className="text-sm text-gray-500">날짜</p>
                         <p className="font-medium text-gray-800">{record.date}</p>
                       </div>
+
                       <div className="text-center">
                         <p className="text-sm text-gray-500">출근</p>
-                        <p className="font-medium text-green-600">{record.checkIn}</p>
+                        <p className="font-medium text-green-600">
+                          {record.checkIn}
+                        </p>
                       </div>
+
                       <div className="text-center">
                         <p className="text-sm text-gray-500">퇴근</p>
-                        <p className="font-medium text-red-600">{record.checkOut}</p>
+                        <p className="font-medium text-red-600">
+                          {record.checkOut}
+                        </p>
                       </div>
+
                       <div className="text-center">
                         <p className="text-sm text-gray-500">근무시간</p>
-                        <p className="font-medium text-blue-600">{record.workHours}시간</p>
+                        <p className="font-medium text-blue-600">
+                          {record.workHours}시간
+                        </p>
                       </div>
+
                       {record.overtime > 0 && (
                         <div className="text-center">
                           <p className="text-sm text-gray-500">연장근무</p>
-                          <p className="font-medium text-orange-600">{record.overtime}시간</p>
+                          <p className="font-medium text-orange-600">
+                            {record.overtime}시간
+                          </p>
                         </div>
                       )}
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getAttendanceStatusColor(record.status)}`}>
+
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-medium ${getAttendanceStatusColor(
+                        record.status,
+                      )}`}
+                    >
                       {getAttendanceStatusText(record.status)}
                     </span>
                   </div>
@@ -1950,11 +2467,15 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">시급</p>
-                    <p className="font-medium">₩{showPayrollDetail.hourlyWage?.toLocaleString()}</p>
+                    <p className="font-medium">
+                      ₩{showPayrollDetail.hourlyWage?.toLocaleString()}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">기간</p>
-                    <p className="font-medium">{monthNames[selectedMonth]} {selectedYear}</p>
+                    <p className="font-medium">
+                      {monthNames[selectedMonth]} {selectedYear}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1965,19 +2486,27 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">정규 근무</p>
-                    <p className="font-medium">{Math.min(showPayrollDetail.weeklyHours || 0, 40)}시간</p>
+                    <p className="font-medium">
+                      {Math.min(showPayrollDetail.weeklyHours || 0, 40)}시간
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">연장 근무</p>
-                    <p className="font-medium">{showPayrollDetail.overtimeHours || 0}시간</p>
+                    <p className="font-medium">
+                      {showPayrollDetail.overtimeHours || 0}시간
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">야간 근무</p>
-                    <p className="font-medium">{showPayrollDetail.nightShiftHours || 0}시간</p>
+                    <p className="font-medium">
+                      {showPayrollDetail.nightShiftHours || 0}시간
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">휴일 근무</p>
-                    <p className="font-medium">{showPayrollDetail.holidayHours || 0}시간</p>
+                    <p className="font-medium">
+                      {showPayrollDetail.holidayHours || 0}시간
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1988,23 +2517,37 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">기본급</span>
-                    <span className="font-medium">₩{calculateBasePay(showPayrollDetail).toLocaleString()}</span>
+                    <span className="font-medium">
+                      ₩{calculateBasePay(showPayrollDetail).toLocaleString()}
+                    </span>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">연장수당 (150%)</span>
-                    <span className="font-medium">₩{calculateOvertimePay(showPayrollDetail).toLocaleString()}</span>
+                    <span className="font-medium">
+                      ₩{calculateOvertimePay(showPayrollDetail).toLocaleString()}
+                    </span>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">야간수당 (50%)</span>
-                    <span className="font-medium">₩{calculateNightShiftPay(showPayrollDetail).toLocaleString()}</span>
+                    <span className="font-medium">
+                      ₩{calculateNightShiftPay(showPayrollDetail).toLocaleString()}
+                    </span>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">휴일수당 (150%)</span>
-                    <span className="font-medium">₩{calculateHolidayPay(showPayrollDetail).toLocaleString()}</span>
+                    <span className="font-medium">
+                      ₩{calculateHolidayPay(showPayrollDetail).toLocaleString()}
+                    </span>
                   </div>
+
                   <div className="border-t pt-3 flex justify-between">
                     <span className="font-bold text-gray-800">총 급여</span>
-                    <span className="font-bold text-green-600">₩{calculateTotalPay(showPayrollDetail).toLocaleString()}</span>
+                    <span className="font-bold text-green-600">
+                      ₩{calculateTotalPay(showPayrollDetail).toLocaleString()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -2014,28 +2557,44 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
                 <h4 className="font-bold text-gray-800 mb-4">공제 내역</h4>
                 <div className="space-y-3">
                   {(() => {
-                    const deductions = calculateDeductions(calculateTotalPay(showPayrollDetail));
+                    const deductions = calculateDeductions(
+                      calculateTotalPay(showPayrollDetail),
+                    );
                     return (
                       <>
                         <div className="flex justify-between">
                           <span className="text-gray-600">국민연금 (4.5%)</span>
-                          <span className="font-medium">₩{deductions.nationalPension.toLocaleString()}</span>
+                          <span className="font-medium">
+                            ₩{deductions.nationalPension.toLocaleString()}
+                          </span>
                         </div>
+
                         <div className="flex justify-between">
                           <span className="text-gray-600">건강보험 (3.35%)</span>
-                          <span className="font-medium">₩{deductions.healthInsurance.toLocaleString()}</span>
+                          <span className="font-medium">
+                            ₩{deductions.healthInsurance.toLocaleString()}
+                          </span>
                         </div>
+
                         <div className="flex justify-between">
                           <span className="text-gray-600">고용보험 (0.8%)</span>
-                          <span className="font-medium">₩{deductions.employmentInsurance.toLocaleString()}</span>
+                          <span className="font-medium">
+                            ₩{deductions.employmentInsurance.toLocaleString()}
+                          </span>
                         </div>
+
                         <div className="flex justify-between">
                           <span className="text-gray-600">소득세 (3.3%)</span>
-                          <span className="font-medium">₩{deductions.incomeTax.toLocaleString()}</span>
+                          <span className="font-medium">
+                            ₩{deductions.incomeTax.toLocaleString()}
+                          </span>
                         </div>
+
                         <div className="border-t pt-3 flex justify-between">
                           <span className="font-bold text-gray-800">총 공제액</span>
-                          <span className="font-bold text-red-600">₩{deductions.total.toLocaleString()}</span>
+                          <span className="font-bold text-red-600">
+                            ₩{deductions.total.toLocaleString()}
+                          </span>
                         </div>
                       </>
                     );
@@ -2048,7 +2607,13 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
                 <div className="flex justify-between items-center">
                   <span className="text-xl font-bold text-gray-800">실수령액</span>
                   <span className="text-2xl font-bold text-purple-600">
-                    ₩{(calculateTotalPay(showPayrollDetail) - calculateDeductions(calculateTotalPay(showPayrollDetail)).total).toLocaleString()}
+                    ₩
+                    {(
+                      calculateTotalPay(showPayrollDetail) -
+                      calculateDeductions(
+                        calculateTotalPay(showPayrollDetail),
+                      ).total
+                    ).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -2077,24 +2642,31 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
             {scheduleGenerationStep === 'select' && (
               <div className="space-y-6">
                 <div className="bg-blue-50 rounded-2xl p-6">
-                  <h4 className="font-bold text-gray-800 mb-4">생성할 스케줄 선택</h4>
+                  <h4 className="font-bold text-gray-800 mb-4">
+                    생성할 스케줄 선택
+                  </h4>
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
                       <label className="text-sm text-gray-600">연도:</label>
                       <select
                         value={scheduleSelectedYear}
-                        onChange={e => setScheduleSelectedYear(parseInt(e.target.value))}
+                        onChange={e =>
+                          setScheduleSelectedYear(parseInt(e.target.value))
+                        }
                         className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
                       >
                         <option value={2024}>2024년</option>
                         <option value={2025}>2025년</option>
                       </select>
                     </div>
+
                     <div className="flex items-center space-x-2">
                       <label className="text-sm text-gray-600">월:</label>
                       <select
                         value={scheduleSelectedMonth}
-                        onChange={e => setScheduleSelectedMonth(parseInt(e.target.value))}
+                        onChange={e =>
+                          setScheduleSelectedMonth(parseInt(e.target.value))
+                        }
                         className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
                       >
                         {monthNames.map((month, index) => (
@@ -2108,21 +2680,33 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
                 </div>
 
                 <div className="bg-green-50 rounded-2xl p-6">
-                  <h4 className="font-bold text-gray-800 mb-4">대기 중인 스케줄 요청</h4>
+                  <h4 className="font-bold text-gray-800 mb-4">
+                    대기 중인 스케줄 요청
+                  </h4>
                   <div className="space-y-3">
-                    {scheduleRequests.filter(req => req.status === 'pending').map(request => (
-                      <div key={request.id} className="bg-white rounded-xl p-4 border border-green-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium text-gray-800">{request.employeeName}</span>
-                            <span className="ml-2 text-sm text-gray-500">
-                              {getRequestTypeText(request.requestType)} • {request.requestedDates?.length}일
+                    {scheduleRequests
+                      .filter(req => req.status === 'pending')
+                      .map(request => (
+                        <div
+                          key={request.id}
+                          className="bg-white rounded-xl p-4 border border-green-200"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-medium text-gray-800">
+                                {request.employeeName}
+                              </span>
+                              <span className="ml-2 text-sm text-gray-500">
+                                {getRequestTypeText(request.requestType)} •{' '}
+                                {request.requestedDates?.length}일
+                              </span>
+                            </div>
+                            <span className="text-xs text-green-600">
+                              자동 반영 예정
                             </span>
                           </div>
-                          <span className="text-xs text-green-600">자동 반영 예정</span>
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
 
@@ -2141,39 +2725,64 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
               <div className="space-y-6">
                 <div className="bg-blue-50 rounded-2xl p-6">
                   <h4 className="font-bold text-gray-800 mb-4">
-                    {scheduleSelectedYear}년 {monthNames[scheduleSelectedMonth]} 스케줄 미리보기
+                    {scheduleSelectedYear}년 {monthNames[scheduleSelectedMonth]} 스케줄
+                    미리보기
                   </h4>
-                  <p className="text-gray-600">생성된 스케줄을 확인하고 수정하세요.</p>
+                  <p className="text-gray-600">
+                    생성된 스케줄을 확인하고 수정하세요.
+                  </p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
                   <div className="grid grid-cols-7 bg-gray-50">
                     {dayNames.map(day => (
-                      <div key={day} className="p-4 text-center font-medium text-gray-700 border-r border-gray-200 last:border-r-0">
+                      <div
+                        key={day}
+                        className="p-4 text-center font-medium text-gray-700 border-r border-gray-200 last:border-r-0"
+                      >
                         {day}
                       </div>
                     ))}
                   </div>
+
                   <div className="grid grid-cols-7">
-                    {Object.keys(generatedSchedule).slice(0, 14).map(dateStr => {
-                      const schedule = generatedSchedule[dateStr];
-                      const date = new Date(dateStr);
-                      return (
-                        <div key={dateStr} className="border-r border-b border-gray-200 last:border-r-0 p-2 min-h-[120px]">
-                          <div className="font-medium mb-2">{date.getDate()}</div>
-                          <div className="space-y-1">
-                            {schedule.shifts.map((shift: any, index: number) => (
-                              <div key={index} className="text-xs bg-blue-100 rounded p-1">
-                                <div className="font-medium text-blue-800">{shift.time}</div>
-                                <div className="text-blue-600">
-                                  {shift.employee ? shift.employee.name : '미배정'}
-                                </div>
-                              </div>
-                            ))}
+                    {Object.keys(generatedSchedule)
+                      .slice(0, 14)
+                      .map(dateStr => {
+                        const schedule = generatedSchedule[dateStr];
+                        const date = new Date(dateStr);
+
+                        return (
+                          <div
+                            key={dateStr}
+                            className="border-r border-b border-gray-200 last:border-r-0 p-2 min-h-[120px]"
+                          >
+                            <div className="font-medium mb-2">
+                              {date.getDate()}
+                            </div>
+
+                            <div className="space-y-1">
+                              {schedule.shifts.map(
+                                (shift: any, index: number) => (
+                                  <div
+                                    key={index}
+                                    className="text-xs bg-blue-100 rounded p-1"
+                                  >
+                                    <div className="font-medium text-blue-800">
+                                      {shift.time}
+                                    </div>
+                                    <div className="text-blue-600">
+                                      {shift.employee
+                                        ? shift.employee.name
+                                        : '미배정'}
+                                    </div>
+                                  </div>
+                                ),
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 </div>
 
@@ -2201,50 +2810,69 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
       {showApprovalModal && employeeToApprove && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">직원 승인</h3>
-            
+            <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
+              직원 승인
+            </h3>
+
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i className="ri-user-line text-teal-500 text-2xl"></i>
               </div>
-              <h4 className="font-bold text-lg text-gray-800">{employeeToApprove.name}</h4>
-              <p className="text-gray-600">{employeeToApprove.position}</p>
+              <h4 className="font-bold text-lg text-gray-800">
+                {employeeToApprove.userName}
+              </h4>
             </div>
 
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">시급 설정</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  시급 설정
+                </label>
                 <input
                   type="number"
                   value={approvalData.hourlyWage}
-                  onChange={e => handleApprovalDataChange('hourlyWage', e.target.value)}
+                  onChange={e =>
+                    handleApprovalDataChange('hourlyWage', e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   placeholder="시급을 입력하세요"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">직책</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  직책
+                </label>
                 <select
                   value={approvalData.position}
-                  onChange={e => handleApprovalDataChange('position', e.target.value)}
+                  onChange={e =>
+                    handleApprovalDataChange('position', e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent pr-8"
                 >
                   {positionOptions.map(position => (
-                    <option key={position} value={position}>{position}</option>
+                    <option key={position} value={position}>
+                      {position}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">부서</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  부서
+                </label>
                 <select
                   value={approvalData.department}
-                  onChange={e => handleApprovalDataChange('department', e.target.value)}
+                  onChange={e =>
+                    handleApprovalDataChange('department', e.target.value)
+                  }
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent pr-8"
                 >
                   {departmentOptions.map(department => (
-                    <option key={department} value={department}>{department}</option>
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -2272,16 +2900,22 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
       {showDeleteModal && employeeToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">직원 삭제</h3>
-            
+            <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
+              직원 삭제
+            </h3>
+
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i className="ri-delete-bin-line text-red-500 text-2xl"></i>
               </div>
+
               <p className="text-gray-600">
-                <span className="font-bold">{employeeToDelete.name}</span>님을 정말 삭제하시겠습니까?
+                <span className="font-bold">{employeeToDelete.name}</span>님을 정말
+                삭제하시겠습니까?
               </p>
-              <p className="text-sm text-red-500 mt-2">이 작업은 되돌릴 수 없습니다.</p>
+              <p className="text-sm text-red-500 mt-2">
+                이 작업은 되돌릴 수 없습니다.
+              </p>
             </div>
 
             <div className="flex space-x-4">
@@ -2301,6 +2935,8 @@ export default function WorkplaceManageDetail({ workplaceId }: { workplaceId: st
           </div>
         </div>
       )}
+
     </div>
+
   );
 }
