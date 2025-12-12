@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import QuickActions from '@/components/QuickActions';
@@ -345,7 +346,6 @@ export default function EmployeeDashboard() {
                 </h1>
                 <p className="text-xl text-gray-600">오늘도 화이팅하세요!</p>
               </div>
-              <div className="text-6xl">💼</div>
             </div>
           </div>
         </div>
@@ -383,7 +383,7 @@ export default function EmployeeDashboard() {
                   : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              📊 대시보드
+              대시보드
             </button>
             <button
               onClick={() => setActiveTab('workplaces')}
@@ -393,7 +393,7 @@ export default function EmployeeDashboard() {
                   : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              🏪 내 근무지
+              내 근무지
             </button>
             <button
               onClick={() => setActiveTab('community')}
@@ -403,7 +403,7 @@ export default function EmployeeDashboard() {
                   : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              💬 커뮤니티
+              커뮤니티
             </button>
             <button
               onClick={() => setActiveTab('tools')}
@@ -413,7 +413,7 @@ export default function EmployeeDashboard() {
                   : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              🛠️ 유용한 도구
+              유용한 도구
             </button>
           </div>
         </div>
@@ -425,7 +425,6 @@ export default function EmployeeDashboard() {
             <div className="lg:col-span-2">
               <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100 mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                  <span className="mr-3">📅</span>
                   오늘의 스케줄
                 </h2>
 
@@ -436,7 +435,6 @@ export default function EmployeeDashboard() {
                 ) : todaySchedules.length === 0 ? (
                   <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                     <div className="text-center text-gray-500">
-                      <div className="text-4xl mb-3">😴</div>
                       <p>오늘은 근무 일정이 없어요!</p>
                     </div>
                   </div>
@@ -547,7 +545,7 @@ export default function EmployeeDashboard() {
           <div>
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-bold text-gray-800">
-                내 근무지 관리 🏪
+                내 근무지 관리
               </h2>
               <button
                 onClick={() => setIsJoinModalOpen(true)}
@@ -585,37 +583,36 @@ export default function EmployeeDashboard() {
           <div>
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-bold text-gray-800">
-                알바생 커뮤니티 💬
+                알바생 커뮤니티
               </h2>
-              <button className="bg-purple-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-purple-600 transition-colors cursor-pointer whitespace-nowrap shadow-sm">
-                <i className="ri-edit-line mr-2"></i>
-                글 작성하기
-              </button>
             </div>
 
             {/* Community Categories (UI 구조만, 데이터 X) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-green-100 hover:shadow-lg transition-all cursor-pointer">
+              <Link
+                href="/employee-dashboard/reviews"
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-green-100 hover:shadow-lg transition-all cursor-pointer"
+              >
                 <div className="text-4xl mb-3">⭐</div>
-                <h3 className="font-bold text-lg text-gray-800 mb-2">
-                  알바 후기
-                </h3>
+                <h3 className="font-bold text-lg text-gray-800 mb-2">알바 후기</h3>
                 <p className="text-gray-600 text-sm">실제 근무 경험 공유</p>
-              </div>
-              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-yellow-100 hover:shadow-lg transition-all cursor-pointer">
+              </Link>
+              <Link
+                href="/employee-dashboard/tips"
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-yellow-100 hover:shadow-lg transition-all cursor-pointer"
+              >
                 <div className="text-4xl mb-3">💡</div>
-                <h3 className="font-bold text-lg text-gray-800 mb-2">
-                  알바 꿀팁
-                </h3>
+                <h3 className="font-bold text-lg text-gray-800 mb-2">알바 꿀팁</h3>
                 <p className="text-gray-600 text-sm">유용한 노하우 공유</p>
-              </div>
-              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-purple-100 hover:shadow-lg transition-all cursor-pointer">
+              </Link>
+              <Link
+                href="/employee-dashboard/education"
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-purple-100 hover:shadow-lg transition-all cursor-pointer"
+              >
                 <div className="text-4xl mb-3">🛡️</div>
-                <h3 className="font-bold text-lg text-gray-800 mb-2">
-                  권리 교육
-                </h3>
+                <h3 className="font-bold text-lg text-gray-800 mb-2">권리 교육</h3>
                 <p className="text-gray-600 text-sm">알바생 권리 정보</p>
-              </div>
+              </Link>
             </div>
 
             {/* Recent Posts (더미 제거, 아직 연동 전) */}
@@ -633,7 +630,7 @@ export default function EmployeeDashboard() {
         {activeTab === 'tools' && (
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-8">
-              유용한 도구들 🛠️
+              유용한 도구들
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

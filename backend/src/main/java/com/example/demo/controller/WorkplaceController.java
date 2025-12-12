@@ -246,4 +246,21 @@ public class WorkplaceController {
         }
     }
 
+    // 직원용 근무지 상세 조회
+    @GetMapping("/employee/{workplaceId}")
+    public ResponseEntity<?> getWorkplaceDetailForEmployee(
+            @PathVariable Long workplaceId,
+            HttpServletRequest request) {
+        try {
+            Long userId = getUserIdFromToken(request);
+            Workplace workplace = workplaceService.getWorkplaceDetailForEmployee(userId, workplaceId);
+            return ResponseEntity.ok(workplace);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+
 }

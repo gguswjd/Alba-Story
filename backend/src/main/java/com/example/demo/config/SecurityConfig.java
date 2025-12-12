@@ -51,7 +51,8 @@ public class SecurityConfig {
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/api/test/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
-                .requestMatchers("/api/workplace/employee/my").permitAll()  // ← 추가
+                .requestMatchers("/api/workplace/employee/**").permitAll()
+                .requestMatchers("/api/workplace/*/employees").permitAll()
                 .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())) // H2 콘솔용

@@ -1,14 +1,13 @@
+// app/employee-dashboard/workplace/[id]/page.tsx
 
 import WorkplaceDetail from './WorkplaceDetail';
 
-export async function generateStaticParams() {
-  return [
-    { id: '1' },
-    { id: '2' },
-    { id: '3' },
-  ];
+interface WorkplacePageProps {
+  params: Promise<{ id: string }>;
 }
 
-export default function WorkplacePage({ params }: { params: { id: string } }) {
-  return <WorkplaceDetail workplaceId={params.id} />;
+export default async function WorkplacePage({ params }: WorkplacePageProps) {
+  const { id } = await params;
+
+  return <WorkplaceDetail workplaceId={id} />;
 }

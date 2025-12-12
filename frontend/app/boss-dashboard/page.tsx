@@ -290,7 +290,6 @@ export default function BossDashboard() {
     { id: 1, title: '직원 관리', description: '직원 정보 및 근무 이력 관리', icon: 'team', color: 'blue' },
     { id: 2, title: '스케줄 관리', description: '근무 일정 및 시프트 관리', icon: 'calendar', color: 'green' },
     { id: 3, title: '급여 관리', description: '급여 계산 및 지급 관리', icon: 'money', color: 'yellow' },
-    { id: 5, title: '공지사항', description: '직원들에게 공지사항 발송', icon: 'notification', color: 'orange' },
   ] as const;
 
   return (
@@ -308,7 +307,6 @@ export default function BossDashboard() {
                 </h1>
                 <p className="text-xl text-gray-600">오늘도 성공적인 매장 운영하세요!</p>
               </div>
-              <div className="text-6xl">🏪</div>
             </div>
           </div>
         </div>
@@ -350,7 +348,7 @@ export default function BossDashboard() {
                 activeTab === 'dashboard' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              📊 대시보드
+              대시보드
             </button>
             <button
               onClick={() => setActiveTab('workplaces')}
@@ -358,7 +356,7 @@ export default function BossDashboard() {
                 activeTab === 'workplaces' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              🏪 매장 관리
+              매장 관리
             </button>
             <button
               onClick={() => setActiveTab('employees')}
@@ -366,7 +364,7 @@ export default function BossDashboard() {
                 activeTab === 'employees' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              👥 직원 관리
+              직원 관리
             </button>
             <button
               onClick={() => setActiveTab('tools')}
@@ -374,7 +372,7 @@ export default function BossDashboard() {
                 activeTab === 'tools' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:text-blue-500'
               }`}
             >
-              🛠️ 관리 도구
+              관리 도구
             </button>
           </div>
         </div>
@@ -385,7 +383,6 @@ export default function BossDashboard() {
             <div className="lg:col-span-2">
               <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100 mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                  <span className="mr-3">📈</span>
                   오늘의 현황
                 </h2>
 
@@ -395,7 +392,7 @@ export default function BossDashboard() {
                 ) : workplaces.length === 0 ? (
                   <div className="text-sm text-gray-500">
                     등록된 근무지가 없습니다. <br />
-                    상단 탭의 <span className="font-semibold">🏪 매장 관리</span>에서 매장을 먼저 등록해주세요.
+                    상단 탭의 <span className="font-semibold">매장 관리</span>에서 매장을 먼저 등록해주세요.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -503,7 +500,7 @@ export default function BossDashboard() {
         {activeTab === 'workplaces' && (
           <div>
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-gray-800">매장 관리 🏪</h2>
+              <h2 className="text-2xl font-bold text-gray-800">매장 관리</h2>
               <button
                 onClick={() => router.push('/boss-dashboard/new-workplace')}
                 className="bg-green-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-green-600 transition-colors cursor-pointer whitespace-nowrap shadow-sm"
@@ -530,7 +527,7 @@ export default function BossDashboard() {
         {activeTab === 'employees' && (
           <div>
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-gray-800">직원 관리 👥</h2>
+              <h2 className="text-2xl font-bold text-gray-800">직원 관리</h2>
               <div className="flex space-x-4">
                 <button className="bg-blue-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-600 transition-colors cursor-pointer whitespace-nowrap shadow-sm">
                   <i className="ri-user-search-line mr-2"></i>
@@ -545,7 +542,6 @@ export default function BossDashboard() {
 
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-blue-100">
               <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                <span className="mr-3">👥</span>
                 현재 직원 현황
               </h3>
 
@@ -604,7 +600,7 @@ export default function BossDashboard() {
 
         {activeTab === 'tools' && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-8">관리 도구 🛠️</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-8">관리 도구</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {managementTools.map((tool) => (

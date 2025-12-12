@@ -192,4 +192,21 @@ public class WorkplaceService {
                 .collect(Collectors.toList());
     }
 
+    public Workplace getWorkplaceDetailForEmployee(Long userId, Long workplaceId) {
+        Workplace wp = workplaceRepository.findById(workplaceId)
+                .orElseThrow(() -> new RuntimeException("근무지를 찾을 수 없습니다."));
+
+        // 직원으로 등록되어 있는지 확인
+        boolean isEmployee = workInfoRepository
+                .findByUserUserIdAndWorkplaceWorkplaceId(userId, workplaceId)
+                .isPresent();
+
+        if (!isEmployee) {
+            throw new RuntimeException("이 근무지에 대한 직원 권한이 없습니다.");
+        }
+
+        return wp;
+    }
+
+
 }
