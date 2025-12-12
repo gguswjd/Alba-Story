@@ -42,11 +42,12 @@ public class ScheduleController {
     public ResponseEntity<?> savePreference(@Valid @RequestBody SchedulePreferenceRequest request, HttpServletRequest httpRequest) {
         try {
             Long userId = getUserIdFromToken(httpRequest);
-            scheduleService.saveSchedulePreference(userId, request);
+            var saved = scheduleService.saveSchedulePreference(userId, request);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "선호도가 저장되었습니다");
+            response.put("preferenceId", saved.getPreferenceId());
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {

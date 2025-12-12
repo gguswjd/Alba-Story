@@ -40,6 +40,21 @@ public class Attendance {
     @Column(name = "work_hours")
     private Float workHours;
 
+    @Column(name = "rest_minutes")
+    private Integer restMinutes;
+
+    @Column(name = "regular_hours")
+    private Float regularHours;
+
+    @Column(name = "overtime_hours")
+    private Float overtimeHours;
+
+    @Column(name = "night_hours")
+    private Float nightHours;
+
+    @Column(name = "holiday_hours")
+    private Float holidayHours;
+
     @Column(nullable = false)
     private Boolean approved = false;
 }

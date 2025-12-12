@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -41,11 +42,11 @@ public class AttendanceService {
 
         LocalDate date = (workDate != null) ? workDate : LocalDate.now();
 
-        // 오늘 이미 출근 기록이 있는지 확인
+        // 열려있는 출근 기록이 있는지 확인
         attendanceRepository.findByWorkplaceWorkplaceIdAndUserUserIdAndWorkDate(workplaceId, userId, date)
                 .ifPresent(attendance -> {
-                    if (attendance.getCheckIn() != null) {
-                        throw new RuntimeException("이미 출근 기록이 있습니다");
+                    if (attendance.getCheckIn() != null && attendance.getCheckOut() == null) {
+                        throw new RuntimeException("이미 출근 상태입니다");
                     }
                 });
 
@@ -83,11 +84,7 @@ public class AttendanceService {
 
         attendance.setCheckOut(LocalDateTime.now());
 
-        // 근무 시간 계산
-        long hours = ChronoUnit.HOURS.between(attendance.getCheckIn(), attendance.getCheckOut());
-        long minutes = ChronoUnit.MINUTES.between(attendance.getCheckIn(), attendance.getCheckOut()) % 60;
-        float workHours = hours + (minutes / 60.0f);
-        attendance.setWorkHours(workHours);
+        fillWorkSegments(attendance);
 
         return attendanceRepository.save(attendance);
     }
@@ -116,13 +113,7 @@ public class AttendanceService {
         attendance.setCheckOut(request.getCheckOut());
         attendance.setApproved(true); // 사장이 만든 기록은 자동 승인
 
-        // 근무 시간 계산
-        if (request.getCheckIn() != null && request.getCheckOut() != null) {
-            long hours = ChronoUnit.HOURS.between(request.getCheckIn(), request.getCheckOut());
-            long minutes = ChronoUnit.MINUTES.between(request.getCheckIn(), request.getCheckOut()) % 60;
-            float workHours = hours + (minutes / 60.0f);
-            attendance.setWorkHours(workHours);
-        }
+        fillWorkSegments(attendance);
 
         return attendanceRepository.save(attendance);
     }
@@ -137,13 +128,7 @@ public class AttendanceService {
         attendance.setCheckOut(checkOut);
         attendance.setApproved(true);
 
-        // 근무 시간 재계산
-        if (checkIn != null && checkOut != null) {
-            long hours = ChronoUnit.HOURS.between(checkIn, checkOut);
-            long minutes = ChronoUnit.MINUTES.between(checkIn, checkOut) % 60;
-            float workHours = hours + (minutes / 60.0f);
-            attendance.setWorkHours(workHours);
-        }
+        fillWorkSegments(attendance);
 
         return attendanceRepository.save(attendance);
     }
@@ -196,5 +181,54 @@ public class AttendanceService {
         
         attendance.setApproved(true);
         return attendanceRepository.save(attendance);
+    }
+
+    private void fillWorkSegments(Attendance attendance) {
+        if (attendance.getCheckIn() == null || attendance.getCheckOut() == null) {
+            return;
+        }
+
+        LocalDateTime in = attendance.getCheckIn();
+        LocalDateTime out = attendance.getCheckOut();
+        if (!out.isAfter(in)) {
+            throw new RuntimeException("퇴근 시간이 출근 시간보다 빠릅니다");
+        }
+
+        long totalMinutes = ChronoUnit.MINUTES.between(in, out);
+        int restMinutes = calculateRestMinutes(totalMinutes);
+        long effectiveMinutes = Math.max(0, totalMinutes - restMinutes);
+
+        float totalHours = totalMinutes / 60f;
+        float effectiveHours = effectiveMinutes / 60f;
+
+        boolean isHoliday = in.getDayOfWeek() == java.time.DayOfWeek.SUNDAY;
+        float nightHours = calculateNightHours(in, out);
+        float holidayHours = isHoliday ? effectiveHours : 0f;
+
+        attendance.setRestMinutes(restMinutes);
+        attendance.setWorkHours(effectiveHours);
+        attendance.setRegularHours(effectiveHours); // 정규/연장 분리는 월 집계 시 수행
+        attendance.setNightHours(nightHours);
+        attendance.setHolidayHours(holidayHours);
+        attendance.setOvertimeHours(0f);
+    }
+
+    private int calculateRestMinutes(long totalMinutes) {
+        if (totalMinutes >= 8 * 60) return 60;
+        if (totalMinutes >= 4 * 60) return 30;
+        return 0;
+    }
+
+    private float calculateNightHours(LocalDateTime in, LocalDateTime out) {
+        LocalDateTime cursor = in;
+        long nightMinutes = 0;
+        while (cursor.isBefore(out)) {
+            LocalDateTime next = cursor.plusMinutes(1);
+            LocalTime t = cursor.toLocalTime();
+            boolean isNight = !t.isBefore(LocalTime.of(22, 0)) || t.isBefore(LocalTime.of(6, 0));
+            if (isNight) nightMinutes++;
+            cursor = next;
+        }
+        return nightMinutes / 60f;
     }
 }

@@ -35,17 +35,58 @@ public class Payroll {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pay_type", nullable = false)
+    private PayType payType;
+
+    @Column(name = "work_days")
+    private Integer workDays;
+
+    @Column(name = "regular_hours")
+    private Float regularHours;
+
+    @Column(name = "overtime_hours")
+    private Float overtimeHours;
+
+    @Column(name = "night_hours")
+    private Float nightHours;
+
+    @Column(name = "holiday_hours")
+    private Float holidayHours;
+
     @Column(name = "total_hours", nullable = false)
     private Float totalHours;
 
-    @Column(name = "total_pay", nullable = false, precision = 10, scale = 2)
+    @Column(name = "base_pay", precision = 12, scale = 2)
+    private BigDecimal basePay;
+
+    @Column(name = "overtime_pay", precision = 12, scale = 2)
+    private BigDecimal overtimePay;
+
+    @Column(name = "night_pay", precision = 12, scale = 2)
+    private BigDecimal nightPay;
+
+    @Column(name = "holiday_pay", precision = 12, scale = 2)
+    private BigDecimal holidayPay;
+
+    @Column(name = "total_pay", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalPay;
 
     @Column(name = "calculated_at")
     private LocalDateTime calculatedAt;
 
+    @Column(name = "finalized")
+    private Boolean finalized = false;
+
+    @Column(name = "finalized_at")
+    private LocalDateTime finalizedAt;
+
     @PrePersist
     protected void onCreate() {
         calculatedAt = LocalDateTime.now();
+    }
+
+    public enum PayType {
+        HOURLY, WEEKLY, MONTHLY
     }
 }

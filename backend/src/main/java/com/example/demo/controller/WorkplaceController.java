@@ -94,12 +94,16 @@ public class WorkplaceController {
     // 가입 신청 처리 (승인/거절) - 확장 버전
     @PostMapping("/requests/{requestId}/respond")
     public ResponseEntity<?> respondToJoinRequest(
-            @PathVariable Long requestId, 
+            @PathVariable Long requestId,
             @RequestParam boolean approved,
             @RequestParam(required = false) String position,
-            @RequestParam(required = false) Integer hourlyWage) {
+            @RequestParam(required = false) Integer hourlyWage,
+            @RequestParam(required = false) String payType,
+            @RequestParam(required = false) Integer weeklyWage,
+            @RequestParam(required = false) Integer monthlyWage) {
         try {
-            WorkJoinRequest request = workplaceService.respondToJoinRequest(requestId, approved, position, hourlyWage);
+            WorkJoinRequest request = workplaceService.respondToJoinRequest(
+                    requestId, approved, position, hourlyWage, payType, weeklyWage, monthlyWage);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);

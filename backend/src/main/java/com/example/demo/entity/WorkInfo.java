@@ -41,11 +41,25 @@ public class WorkInfo {
     @Column(name = "hourly_wage", precision = 10, scale = 2)
     private BigDecimal hourlyWage;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pay_type")
+    private PayType payType = PayType.HOURLY; // 기본 시급제
+
+    @Column(name = "weekly_wage", precision = 12, scale = 2)
+    private BigDecimal weeklyWage; // 주급제 사용 시
+
+    @Column(name = "monthly_wage", precision = 12, scale = 2)
+    private BigDecimal monthlyWage; // 월급제 사용 시
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+    }
+
+    public enum PayType {
+        HOURLY, WEEKLY, MONTHLY
     }
 }

@@ -89,7 +89,8 @@ public class WorkplaceService {
 
     // 가입 신청 처리 (승인/거절)
     @Transactional
-    public WorkJoinRequest respondToJoinRequest(Long requestId, boolean approved, String position, Integer hourlyWage) {
+    public WorkJoinRequest respondToJoinRequest(Long requestId, boolean approved, String position, Integer hourlyWage,
+                                                String payType, Integer weeklyWage, Integer monthlyWage) {
         WorkJoinRequest request = workJoinRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("가입 신청을 찾을 수 없습니다"));
 
@@ -101,23 +102,31 @@ public class WorkplaceService {
 
         // 승인 시 WorkInfo 생성
         if (approved) {
-            createWorkInfo(request.getUser(), request.getWorkplace(), position, hourlyWage);
+            createWorkInfo(request.getUser(), request.getWorkplace(), position, hourlyWage, payType, weeklyWage, monthlyWage);
         }
 
         return workJoinRequestRepository.save(request);
     }
 
     // WorkInfo 생성 (근무 정보)
-    private com.example.demo.entity.WorkInfo createWorkInfo(User user, Workplace workplace, String position, Integer hourlyWage) {
+    private com.example.demo.entity.WorkInfo createWorkInfo(User user, Workplace workplace, String position, Integer hourlyWage,
+                                                            String payType, Integer weeklyWage, Integer monthlyWage) {
         com.example.demo.entity.WorkInfo workInfo = new com.example.demo.entity.WorkInfo();
         workInfo.setUser(user);
         workInfo.setWorkplace(workplace);
         workInfo.setPosition(position);
-        
-        if (hourlyWage != null) {
-            workInfo.setHourlyWage(new java.math.BigDecimal(hourlyWage));
+
+        if (hourlyWage != null) workInfo.setHourlyWage(new java.math.BigDecimal(hourlyWage));
+        if (weeklyWage != null) workInfo.setWeeklyWage(new java.math.BigDecimal(weeklyWage));
+        if (monthlyWage != null) workInfo.setMonthlyWage(new java.math.BigDecimal(monthlyWage));
+        if (payType != null) {
+            try {
+                workInfo.setPayType(com.example.demo.entity.WorkInfo.PayType.valueOf(payType.toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                throw new RuntimeException("payType은 HOURLY/WEEKLY/MONTHLY 중 하나여야 합니다");
+            }
         }
-        
+
         return workInfoRepository.save(workInfo);
     }
 
