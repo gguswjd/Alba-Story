@@ -70,7 +70,6 @@ public class ScheduleService {
                     return p;
                 });
 
-        // 덮어쓰기: 전체 삭제, 갱신: 전달된 날짜만 교체
         Set<LocalDate> incomingDates = request.getDays().stream()
                 .map(SchedulePreferenceRequest.DayPreference::getDate)
                 .collect(Collectors.toSet());
@@ -176,7 +175,7 @@ public class ScheduleService {
         return scheduleRepository.findByUserUserId(userId);
     }
 
-    // 스케줄 충돌 체크
+    // 스케줄 충돌 추가
     public boolean hasScheduleConflict(Long userId, LocalDateTime startTime, LocalDateTime endTime) {
         List<Schedule> userSchedules = scheduleRepository.findByUserUserId(userId);
 

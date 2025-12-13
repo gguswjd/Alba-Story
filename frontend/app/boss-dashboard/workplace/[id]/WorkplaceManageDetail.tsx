@@ -196,6 +196,10 @@ export default function WorkplaceManageDetail({ workplaceId }: WorkplaceManageDe
   const [generatedSchedule, setGeneratedSchedule] = useState<any>({});
   const [scheduleGenerationStep, setScheduleGenerationStep] =
     useState<'select' | 'generate' | 'review'>('select');
+  
+  // 스케줄 데이터 상태
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
 
   // 클라이언트에서만 현재 날짜 설정
   useEffect(() => {
@@ -396,6 +400,43 @@ export default function WorkplaceManageDetail({ workplaceId }: WorkplaceManageDe
     }
   };
 
+  // 스케줄 데이터 조회
+  const fetchSchedules = async () => {
+    if (!workplaceId) {
+      console.error('⚠️ fetchSchedules: workplaceId 없음, 호출 중단');
+      return;
+    }
+
+    try {
+      setIsLoadingSchedules(true);
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+      const res = await fetch(
+        `http://localhost:8080/api/schedule/workplace/${encodeURIComponent(workplaceId)}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+      );
+
+      if (!res.ok) {
+        console.error('스케줄 조회 실패 status:', res.status);
+        setSchedules([]);
+        return;
+      }
+
+      const raw = await res.json();
+      const list: any[] = Array.isArray(raw) ? raw : raw.content ?? raw.data ?? [];
+
+      setSchedules(list);
+    } catch (e) {
+      console.error('스케줄 조회 중 오류:', e);
+      setSchedules([]);
+    } finally {
+      setIsLoadingSchedules(false);
+    }
+  };
+
   // 모달이 떠 있는 동안 / 또는 진입 시 DB에서 데이터 로드
   useEffect(() => {
     if (!isClient) return;
@@ -407,6 +448,7 @@ export default function WorkplaceManageDetail({ workplaceId }: WorkplaceManageDe
     fetchWorkplace();
     fetchEmployees();
     fetchJoinRequests(); // 🔥 가입요청도 함께 로드
+    fetchSchedules(); // 🔥 스케줄 데이터도 함께 로드
   }, [isClient, workplaceId]);
 
   // 출퇴근 기록 Mock 데이터 (이 부분은 아직 더미 유지)
@@ -807,110 +849,119 @@ export default function WorkplaceManageDetail({ workplaceId }: WorkplaceManageDe
     setAttendanceEmployee(null);
   };
 
-  // 스케줄 생성 함수들
-  const generateMonthlySchedule = () => {
-    const year = scheduleSelectedYear;
-    const month = scheduleSelectedMonth;
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const schedule: any = {};
-
-    const pendingRequests = scheduleRequests.filter((req) => req.status === 'pending');
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const dateStr = date.toISOString().split('T')[0];
-      const dayOfWeek = date.getDay();
-
-      schedule[dateStr] = {
-        date: dateStr,
-        dayOfWeek: dayOfWeek,
-        shifts: []
-      };
-
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        schedule[dateStr].shifts = [
-          { time: '09:00-15:00', employee: null, type: 'morning' },
-          { time: '15:00-21:00', employee: null, type: 'afternoon' }
-        ];
-      } else {
-        schedule[dateStr].shifts = [
-          { time: '09:00-15:00', employee: null, type: 'morning' },
-          { time: '15:00-21:00', employee: null, type: 'afternoon' },
-          { time: '21:00-24:00', employee: null, type: 'night' }
-        ];
-      }
+  // 스케줄 생성 함수들 (API 호출)
+  const generateMonthlySchedule = async () => {
+    if (!workplaceId) {
+      alert('근무지 정보가 없습니다.');
+      return;
     }
 
-    const activeEmployees = employees.filter((emp) => emp.status === 'active');
+    try {
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
-    pendingRequests.forEach((request) => {
-      const employee = activeEmployees.find((emp) => emp.id === request.employeeId);
-      if (!employee || !request.requestedDates) return;
+      const year = scheduleSelectedYear;
+      const month = scheduleSelectedMonth;
+      const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
-      request.requestedDates.forEach((dateStr) => {
-        if (schedule[dateStr]) {
-          const preferredTimes = request.preferredTimes || [];
+      const requestBody = {
+        workplaceId: parseInt(workplaceId),
+        startDate: startDate,
+        endDate: endDate,
+        openTime: '09:00',
+        closeTime: '22:00',
+        slotHours: 4,
+        minStaffPerSlot: 1,
+        maxStaffPerSlot: 3,
+        overwriteExisting: true,
+      };
 
-          preferredTimes.forEach((timeSlot) => {
-            let targetShift = null;
-
-            if (timeSlot.includes('오전') || timeSlot.includes('09:00')) {
-              targetShift = schedule[dateStr].shifts.find(
-                (s: any) => s.type === 'morning' && !s.employee
-              );
-            } else if (timeSlot.includes('오후') || timeSlot.includes('15:00')) {
-              targetShift = schedule[dateStr].shifts.find(
-                (s: any) => s.type === 'afternoon' && !s.employee
-              );
-            } else if (timeSlot.includes('저녁') || timeSlot.includes('야간')) {
-              targetShift = schedule[dateStr].shifts.find(
-                (s: any) => s.type === 'night' && !s.employee
-              );
-            }
-
-            if (targetShift) {
-              targetShift.employee = {
-                id: employee.id,
-                name: employee.name,
-                position: employee.position
-              };
-            }
-          });
-        }
+      const res = await fetch('http://localhost:8080/api/schedule/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(requestBody),
       });
-    });
 
-    Object.keys(schedule).forEach((dateStr) => {
-      schedule[dateStr].shifts.forEach((shift: any) => {
-        if (!shift.employee) {
-          const activeEmployees = employees.filter((emp) => emp.status === 'active');
-          const availableEmployee = activeEmployees.find((emp) => {
-            const alreadyScheduled = schedule[dateStr].shifts.some(
-              (s: any) => s.employee && s.employee.id === emp.id
-            );
-            return !alreadyScheduled;
-          });
+      if (!res.ok) {
+        const error = await res.json();
+        console.error('스케줄 생성 실패:', error);
+        alert('스케줄 생성에 실패했습니다: ' + (error.message || '알 수 없는 오류'));
+        return;
+      }
 
-          if (availableEmployee) {
-            shift.employee = {
-              id: availableEmployee.id,
-              name: availableEmployee.name,
-              position: availableEmployee.position
-            };
-          }
+      const result = await res.json();
+      const generatedSchedules = result.schedules || [];
+
+      // 생성된 스케줄을 날짜별로 그룹화
+      const scheduleByDate: any = {};
+      generatedSchedules.forEach((schedule: any) => {
+        if (!schedule.startTime) return;
+        const scheduleDate = new Date(schedule.startTime);
+        const dateStr = scheduleDate.toISOString().split('T')[0];
+
+        if (!scheduleByDate[dateStr]) {
+          scheduleByDate[dateStr] = {
+            date: dateStr,
+            dayOfWeek: scheduleDate.getDay(),
+            shifts: [],
+          };
         }
-      });
-    });
 
-    setGeneratedSchedule(schedule);
-    setScheduleGenerationStep('review');
+        const startTime = new Date(schedule.startTime).toLocaleTimeString('ko-KR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        });
+        const endTime = new Date(schedule.endTime).toLocaleTimeString('ko-KR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        });
+
+        const hour = new Date(schedule.startTime).getHours();
+        let type = 'afternoon';
+        if (hour < 12) type = 'morning';
+        else if (hour >= 21) type = 'night';
+
+        scheduleByDate[dateStr].shifts.push({
+          time: `${startTime}-${endTime}`,
+          employee: {
+            id: schedule.user?.userId,
+            name: schedule.user?.name || '알 수 없음',
+            position: '직원',
+          },
+          type: type,
+          scheduleId: schedule.scheduleId,
+        });
+      });
+
+      setGeneratedSchedule(scheduleByDate);
+      setScheduleGenerationStep('review');
+      
+      // 스케줄 생성 후 목록 새로고침
+      await fetchSchedules();
+    } catch (e) {
+      console.error('스케줄 생성 중 오류:', e);
+      alert('스케줄 생성 중 오류가 발생했습니다.');
+    }
   };
 
-  const confirmSchedule = () => {
-    console.log('스케줄 확정:', generatedSchedule);
-    alert('스케줄이 성공적으로 생성되었습니다! 🎉');
-    setShowScheduleGeneratorModal(false);
-    setScheduleGenerationStep('select');
+  const confirmSchedule = async () => {
+    try {
+      // 스케줄이 이미 생성되어 DB에 저장되었으므로, 목록만 새로고침
+      await fetchSchedules();
+      alert('스케줄이 성공적으로 생성되었습니다! 🎉');
+      setShowScheduleGeneratorModal(false);
+      setScheduleGenerationStep('select');
+    } catch (e) {
+      console.error('스케줄 확정 중 오류:', e);
+      alert('스케줄 확정 중 오류가 발생했습니다.');
+    }
   };
 
   const monthNames = [
@@ -1758,38 +1809,52 @@ export default function WorkplaceManageDetail({ workplaceId }: WorkplaceManageDe
                       const dateStr = date.toISOString().split('T')[0];
                       const isToday = date.toDateString() === new Date().toDateString();
 
-                      // 해당 날짜의 스케줄 데이터 (실제로는 API에서 가져올 데이터)
+                      // 해당 날짜의 스케줄 데이터 (API에서 가져온 실제 데이터)
                       const daySchedule = (() => {
-                        const dayOfWeek = date.getDay();
                         if (!isCurrentMonth) return [];
 
-                        // 샘플 스케줄 데이터
-                        const sampleSchedules = [
-                          {
-                            time: '09:00-15:00',
-                            employee: '김민수',
-                            position: '매니저',
-                            type: 'morning',
-                          },
-                          {
-                            time: '15:00-21:00',
-                            employee: '이지은',
-                            position: '직원',
-                            type: 'afternoon',
-                          },
-                          {
-                            time: '21:00-24:00',
-                            employee: '박준호',
-                            position: '직원',
-                            type: 'night',
-                          },
-                        ];
+                        // 해당 날짜의 스케줄 필터링
+                        const daySchedules = schedules.filter((schedule) => {
+                          if (!schedule.startTime) return false;
+                          const scheduleDate = new Date(schedule.startTime);
+                          return (
+                            scheduleDate.getFullYear() === date.getFullYear() &&
+                            scheduleDate.getMonth() === date.getMonth() &&
+                            scheduleDate.getDate() === date.getDate()
+                          );
+                        });
 
-                        // 주말에는 야간 근무 제외
-                        if (dayOfWeek === 0 || dayOfWeek === 6) {
-                          return sampleSchedules.slice(0, 2);
-                        }
-                        return sampleSchedules;
+                        // 스케줄을 시간대별로 그룹화
+                        return daySchedules.map((schedule) => {
+                          const startTime = schedule.startTime
+                            ? new Date(schedule.startTime).toLocaleTimeString('ko-KR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
+                              })
+                            : '09:00';
+                          const endTime = schedule.endTime
+                            ? new Date(schedule.endTime).toLocaleTimeString('ko-KR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
+                              })
+                            : '18:00';
+
+                          // 시간대 타입 판단
+                          let type = 'afternoon';
+                          const hour = new Date(schedule.startTime).getHours();
+                          if (hour < 12) type = 'morning';
+                          else if (hour >= 21) type = 'night';
+
+                          return {
+                            time: `${startTime}-${endTime}`,
+                            employee: schedule.user?.name ?? '알 수 없음',
+                            position: schedule.user?.position ?? '직원',
+                            type: type,
+                            scheduleId: schedule.scheduleId,
+                          };
+                        });
                       })();
 
                       return (
@@ -1862,25 +1927,72 @@ export default function WorkplaceManageDetail({ workplaceId }: WorkplaceManageDe
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-green-100">
                 <div className="text-2xl font-bold text-green-500 mb-2">
-                  {activeEmployees.length * 20}
+                  {(() => {
+                    const monthSchedules = schedules.filter((s) => {
+                      if (!s.startTime) return false;
+                      const scheduleDate = new Date(s.startTime);
+                      return (
+                        scheduleDate.getFullYear() === scheduleSelectedYear &&
+                        scheduleDate.getMonth() === scheduleSelectedMonth
+                      );
+                    });
+                    return monthSchedules.length;
+                  })()}
                 </div>
                 <div className="text-gray-600">📅 이번달 총 시프트</div>
               </div>
 
               <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-blue-100">
                 <div className="text-2xl font-bold text-blue-500 mb-2">
-                  {activeEmployees.length * 160}
+                  {(() => {
+                    const monthSchedules = schedules.filter((s) => {
+                      if (!s.startTime) return false;
+                      const scheduleDate = new Date(s.startTime);
+                      return (
+                        scheduleDate.getFullYear() === scheduleSelectedYear &&
+                        scheduleDate.getMonth() === scheduleSelectedMonth
+                      );
+                    });
+                    const totalHours = monthSchedules.reduce((total, s) => {
+                      if (s.startTime && s.endTime) {
+                        const start = new Date(s.startTime);
+                        const end = new Date(s.endTime);
+                        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                        return total + hours;
+                      }
+                      return total;
+                    }, 0);
+                    return Math.round(totalHours);
+                  })()}
                 </div>
                 <div className="text-gray-600">⏰ 총 근무시간</div>
               </div>
 
               <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-orange-100">
-                <div className="text-2xl font-bold text-orange-500 mb-2">3</div>
+                <div className="text-2xl font-bold text-orange-500 mb-2">
+                  {scheduleRequests.filter((req) => req.status === 'pending').length}
+                </div>
                 <div className="text-gray-600">👥 배정 대기</div>
               </div>
 
               <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-purple-100">
-                <div className="text-2xl font-bold text-purple-500 mb-2">95%</div>
+                <div className="text-2xl font-bold text-purple-500 mb-2">
+                  {(() => {
+                    const monthSchedules = schedules.filter((s) => {
+                      if (!s.startTime) return false;
+                      const scheduleDate = new Date(s.startTime);
+                      return (
+                        scheduleDate.getFullYear() === scheduleSelectedYear &&
+                        scheduleDate.getMonth() === scheduleSelectedMonth
+                      );
+                    });
+                    const totalPossible = activeEmployees.length * 20; // 예상 가능한 시프트 수
+                    return totalPossible > 0
+                      ? Math.round((monthSchedules.length / totalPossible) * 100)
+                      : 0;
+                  })()}
+                  %
+                </div>
                 <div className="text-gray-600">📊 배정 완료율</div>
               </div>
             </div>
@@ -1894,13 +2006,41 @@ export default function WorkplaceManageDetail({ workplaceId }: WorkplaceManageDe
 
               <div className="space-y-4">
                 {activeEmployees.map(employee => {
-                  // 해당 직원의 월간 스케줄 통계 (샘플 데이터)
+                  // 해당 직원의 월간 스케줄 통계 (실제 API 데이터 기반)
+                  const employeeSchedules = schedules.filter((schedule) => {
+                    if (!schedule.user?.userId) return false;
+                    const scheduleDate = schedule.startTime ? new Date(schedule.startTime) : null;
+                    return (
+                      schedule.user.userId === employee.id &&
+                      scheduleDate &&
+                      scheduleDate.getFullYear() === scheduleSelectedYear &&
+                      scheduleDate.getMonth() === scheduleSelectedMonth
+                    );
+                  });
+
                   const monthlySchedule = {
-                    totalShifts: Math.floor(Math.random() * 10) + 15,
-                    morningShifts: Math.floor(Math.random() * 8) + 5,
-                    afternoonShifts: Math.floor(Math.random() * 8) + 5,
-                    nightShifts: Math.floor(Math.random() * 5) + 2,
-                    totalHours: Math.floor(Math.random() * 50) + 120,
+                    totalShifts: employeeSchedules.length,
+                    morningShifts: employeeSchedules.filter((s) => {
+                      const hour = s.startTime ? new Date(s.startTime).getHours() : 12;
+                      return hour < 12;
+                    }).length,
+                    afternoonShifts: employeeSchedules.filter((s) => {
+                      const hour = s.startTime ? new Date(s.startTime).getHours() : 12;
+                      return hour >= 12 && hour < 21;
+                    }).length,
+                    nightShifts: employeeSchedules.filter((s) => {
+                      const hour = s.startTime ? new Date(s.startTime).getHours() : 12;
+                      return hour >= 21;
+                    }).length,
+                    totalHours: employeeSchedules.reduce((total, s) => {
+                      if (s.startTime && s.endTime) {
+                        const start = new Date(s.startTime);
+                        const end = new Date(s.endTime);
+                        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                        return total + hours;
+                      }
+                      return total;
+                    }, 0),
                   };
 
                   return (
